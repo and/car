@@ -44,6 +44,8 @@ h1{margin:0;font-family:var(--font-display);font-weight:700;font-size:30px;line-
 .sec{font-family:var(--font-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;color:var(--muted)}
 .detail h2{margin:2px 0 0;font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.05;text-wrap:balance}
 .who{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:#8a4a00;white-space:nowrap}
+.who.sheet{background:#e3efe7;color:#24603d}
+.item .ref{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .who.garage{background:#e6ebf2;color:#33445a}
 dl{margin:0;display:grid;gap:8px}
 dt{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
@@ -159,7 +161,7 @@ body.present .callout .ck{font-size:14px}
         </div>
         <button class="x" id="dClose" aria-label="Show all parts">×</button>
       </div>
-      <div class="drow"><span class="who" id="dWho"></span></div>
+      <div class="drow"><span class="who" id="dWho"></span><span class="who sheet" id="dRef"></span></div>
       <dl>
         <div><dt>What it does</dt><dd id="dWhat"></dd></div>
         <div><dt>What to check</dt><dd id="dCheck"></dd></div>
@@ -200,8 +202,8 @@ const PARTS = [
   what:"Burns petrol to make power. Mounted sideways (transverse) at the front and drives the front wheels through the gearbox.",
   check:"Listen for knocking or ticking at idle. Look for oil seeping where the head meets the block.",
   signs:"Check-engine light, rough idle, loss of power, blue or black smoke."},
- {id:"belt",s:"A1",n:"Accessory drive belt (water pump drive)",who:"DIY check, garage fix",
-  what:"One rubber belt from the crankshaft pulley drives the water pump, alternator and AC compressor.",
+ {id:"belt",s:"A1",n:"Water pump & drive belt",who:"DIY check, garage fix",
+  what:"The water pump pushes coolant around the engine. One rubber belt from the crankshaft pulley drives it, along with the alternator and AC compressor.",
   check:"Wear: cracks, shiny glazing, frayed edges. Tension: about 1 cm of give under firm thumb pressure.",
   signs:"Squeal at cold start or when the AC switches on; battery light if it slips."},
  {id:"coolant",s:"A1",n:"Coolant reservoir",who:"DIY",
@@ -220,9 +222,9 @@ const PARTS = [
   what:"Thin fins pass engine heat to the air. The electric fan pulls air through when the car is slow or stopped.",
   check:"Fins free of leaves and mud, no leaks at the side tanks, fan runs when hot or with AC on.",
   signs:"Overheats in traffic but fine on the highway (usually the fan)."},
- {id:"mounts",s:"A1",n:"Engine mounts",who:"Garage",
-  what:"Rubber blocks that hold the engine and gearbox to the body and soak up vibration.",
-  check:"Cracked or oil-soaked rubber; engine rocking a lot when revved in neutral.",
+ {id:"mounts",s:"A1",n:"Engine mounts & manifold fixings",who:"Garage",
+  what:"Rubber mounts hold the engine and gearbox to the body and soak up vibration. Studs and nuts clamp the manifolds to the cylinder head.",
+  check:"Cracked or oil-soaked mount rubber; engine rocking a lot when revved in neutral; loose or missing manifold nuts.",
   signs:"Clunk when pulling away or changing gear, heavy vibration at idle."},
  {id:"exhaust",s:"A1",n:"Exhaust system",who:"Garage",
   what:"Manifold, catalytic converter and silencer carry exhaust gas to the rear and cut noise and emissions.",
@@ -232,7 +234,7 @@ const PARTS = [
   what:"PCV vents gases from inside the engine back into the intake. EGR recirculates a little exhaust to cut emissions.",
   check:"Hoses not cracked, valve not clogged with sludge.",
   signs:"Rough idle, oil leaks from seals, check-engine codes."},
- {id:"plugs",s:"A2",n:"Spark plugs & ignition coils",who:"DIY on many cars",
+ {id:"plugs",s:"A2",n:"Spark plugs, coils & connectors",who:"DIY on many cars",
   what:"Each coil makes high voltage and its plug fires the spark inside one of the four cylinders.",
   check:"Plug electrode wear and gap, coil connectors clipped, no cracked coil boots.",
   signs:"Misfire, jerking under load, poor mileage, codes P0300 to P0304."},
@@ -328,14 +330,22 @@ const PARTS = [
   what:"Damp the bouncing of the springs.",
   check:"Oil on the body; bounce test: push a corner down, it should settle after one rebound.",
   signs:"Floaty ride, bouncing after speed breakers."},
- {id:"steeringwheel",s:"A9",n:"Steering wheel & column (tilt)",who:"DIY check",
-  what:"The column links the wheel to the rack. The tilt lever adjusts the wheel's height.",
-  check:"Very little free play before the wheels start to turn; tilt lever locks firmly.",
+ {id:"suspbolts",s:"A8",n:"Suspension bolts & nuts",who:"Garage",
+  what:"The bolts that hold struts, arms and the rear axle to the body. Highlighted in gold on the model.",
+  check:"Tightness and rust; marks showing a bolt has moved.",
+  signs:"New clunks or rattles over bumps, steering pulling after a pothole hit."},
+ {id:"steeringwheel",s:"A9",n:"Steering wheel & column",who:"DIY check",
+  what:"The column links the wheel to the steering rack.",
+  check:"Very little free play before the wheels start to turn; wheel does not feel loose.",
   signs:"Clunk in the column, loose-feeling wheel."},
  {id:"rack",s:"A9",n:"Steering rack & tie rods",who:"Garage",
   what:"Turns the wheel's rotation into side-to-side movement of the front wheels. Most new cars add electric power assist.",
   check:"Rubber gaiters on the rack not torn; no play at the tie-rod ends.",
   signs:"Knocking on rough roads, car wanders, front tyres wear on the edges."},
+ {id:"tilt",s:"A9",n:"Tilt steering adjustment",who:"DIY check",
+  what:"A lever under the column unlocks it so the wheel can be raised or lowered.",
+  check:"Wheel moves smoothly through its range and locks firmly with no play once the lever is closed.",
+  signs:"Wheel creeps or rattles after adjusting; lever won't lock."},
  {id:"battery",s:"A10",n:"Battery",who:"DIY",
   what:"12 V battery that starts the engine and runs the electrics when the engine is off.",
   check:"About 12.6 V at rest and 13.8–14.5 V with the engine running. Terminals clean and tight. Most are sealed, so electrolyte can't be topped up.",
@@ -372,6 +382,10 @@ const PARTS = [
   what:"The floor structure, plus the subframe that carries the engine and front suspension.",
   check:"Bolts tight, rust on the floor and sills, damage from speed breakers.",
   signs:"Scraping noises, new rattles."},
+ {id:"chassisbolts",s:"A11",n:"Chassis bolts & nuts",who:"Garage",
+  what:"Bolts that hold the subframe and seats to the body. Highlighted in gold on the model.",
+  check:"Tighten to the specified torque; look for rust or missing bolts.",
+  signs:"Knocks or rattles from under the car, seats that shift."},
  {id:"latches",s:"A11",n:"Latches, hinges & locks",who:"DIY",
   what:"Bonnet latch, door hinges, door locks and the hatch latch.",
   check:"Everything opens, closes and locks smoothly. Lubricate the hinges.",
@@ -385,6 +399,7 @@ const PARTS = [
   check:"Every warning light glows at key-on and goes out once the engine starts.",
   signs:"Red means stop (oil pressure, temperature, brakes). Amber means get it checked soon (engine, ABS, airbag)."}
 ];
+const SHEET={"engine": "Whole engine", "belt": "1a", "coolant": "1b", "oil": "1c", "hoses": "1d", "radiator": "1e", "mounts": "1f", "exhaust": "1g", "pcv": "1h", "plugs": "2a", "airfilter": "3a", "fueltank": "3b", "fuelfilter": "3c", "clutchpedal": "4a", "clutchfluid": "4b", "gearbox": "4c", "gearlever": "4d", "driveshaft": "5a", "cvboot": "5b", "brakefluid": "6a, 6e", "brakepedal": "6b", "parking": "6c", "discs": "6d, 6e", "drums": "6e", "brakelines": "6f", "tyres": "7a", "wheels": "7b", "bearings": "7c", "struts": "8a", "arms": "8b", "rearaxle": "8b", "springs": "8c", "shocks": "8d", "suspbolts": "8e", "steeringwheel": "9a", "rack": "9b", "tilt": "9c", "battery": "10a", "alternator": "Extra", "harness": "10b", "lights": "10c", "ac": "10d", "wipers": "10e", "horn": "10f", "seats": "11a", "chassis": "11b", "chassisbolts": "11b", "latches": "11c", "obd": "Extra", "cluster": "Extra"};
 const BY_ID = Object.fromEntries(PARTS.map(p=>[p.id,p]));
 
 /* ---------- Checked state (this browser only) ---------- */
@@ -406,7 +421,8 @@ function buildList(){
     g.appendChild(h);
     for(const p of parts){
       const b=document.createElement("button"); b.className="item"; b.type="button"; b.dataset.id=p.id;
-      b.innerHTML='<span class="tick" aria-hidden="true">✓</span><span class="nm"></span>';
+      b.innerHTML='<span class="tick" aria-hidden="true">✓</span><span class="nm"></span><span class="ref"></span>';
+      b.querySelector(".ref").textContent = /^\d/.test(SHEET[p.id]||"") ? SHEET[p.id] : "";
       b.querySelector(".nm").textContent=p.n;
       b.addEventListener("click",()=>select(p.id,true));
       b.addEventListener("mouseenter",()=>setHover(p.id));
@@ -441,6 +457,7 @@ function showDetail(id){
   document.getElementById("dSec").textContent=p.s+" · "+SECTIONS[p.s];
   document.getElementById("dName").textContent=p.n;
   const w=document.getElementById("dWho"); w.textContent=p.who; w.classList.toggle("garage",p.who==="Garage");
+  const r=SHEET[p.id]; document.getElementById("dRef").textContent = (r==="Extra") ? "Not on workshop sheet" : (r==="Whole engine" ? "Workshop sheet: section 1" : "Workshop sheet: "+r);
   document.getElementById("dWhat").textContent=p.what;
   document.getElementById("dCheck").textContent=p.check;
   document.getElementById("dSigns").textContent=p.signs;
@@ -465,7 +482,7 @@ catch(e){ document.getElementById("err").style.display="grid"; }
 const ACCENT=0xf08a00;
 const comps={}; PARTS.forEach(p=>comps[p.id]={meshes:[]});
 const pickables=[], neutral=[];
-let scene,camera,controls,body,bodyEdges,glass;
+let scene,camera,controls,body,bodyEdges,glass,bodyMat,edgeMat;
 const exterior=[];
 let focusCenter=null;
 function stripes(a,b,n){
@@ -575,6 +592,11 @@ function helix(id,p,h,R,turns,r,c){
   for(let i=0;i<=n;i++){ const t=i/n,a=t*turns*Math.PI*2; pts.push([p[0]+R*Math.cos(a),p[1]+t*h,p[2]+R*Math.sin(a)]); }
   return tube(id,pts,r,c);
 }
+function hexnut(id,p,axis,r){
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,r*0.8,6),mat(0xd8b65a,{metalness:0.8,roughness:0.3}));
+  if(axis==="x") m.rotation.z=-Math.PI/2; if(axis==="z") m.rotation.x=Math.PI/2;
+  m.position.set(p[0],p[1],p[2]); return add(id,m);
+}
 function sphere(id,r,p,c,o){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),mat(c,o)); m.position.set(p[0],p[1],p[2]); return id?add(id,m):addNeutral(m); }
 
 /* Colours */
@@ -582,7 +604,13 @@ const K={ steel:0x8b96a2, dark:0x3a424c, rubber:0x1e2227, alu:0xbcc5ce, rust:0x8
   belt:0x2a2e33, spring:0x3f7fbf, fluidCool:0xf3a6c0, fluidBrake:0xe8c24a, washer:0x5aa9e6, seat:0x55657a };
 
 function buildCar(){
-  /* Body shell: curved side profile extruded across the width (x = forward, y = up, z = right/driver side) */
+  /* Body shell: lower body, roof and pillars built separately so the windows are real openings.
+     x = forward, y = up, z = right/driver side */
+  bodyMat=new THREE.MeshPhysicalMaterial({color:lin(0x1d4f91),metalness:0.45,roughness:0.32,clearcoat:1,clearcoatRoughness:0.08,transparent:true,opacity:0.09,depthWrite:false,side:THREE.DoubleSide});
+  edgeMat=new THREE.LineBasicMaterial({color:0x15202e,transparent:true,opacity:0.32});
+  body=new THREE.Group(); bodyEdges=new THREE.Group();
+  const shellPart=(geo)=>{ const m=new THREE.Mesh(geo,bodyMat); m.renderOrder=10; body.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,30),edgeMat); e.renderOrder=11; bodyEdges.add(e); return m; };
   const sh=new THREE.Shape();
   const arch=(c,r)=>{ for(let i=0;i<=20;i++){ const t=Math.PI-(i/20)*Math.PI; sh.lineTo(c+r*Math.cos(t),0.30+r*Math.sin(t)); } };
   sh.moveTo(1.82,0.31);
@@ -590,30 +618,35 @@ function buildCar(){
   sh.lineTo(1.89,0.63);
   sh.quadraticCurveTo(1.87,0.76,1.76,0.80);
   sh.quadraticCurveTo(1.35,0.92,0.95,0.98);
-  sh.quadraticCurveTo(0.55,1.22,0.20,1.41);
-  sh.quadraticCurveTo(-0.45,1.49,-1.28,1.43);
-  sh.quadraticCurveTo(-1.66,1.38,-1.79,1.13);
-  sh.quadraticCurveTo(-1.88,0.93,-1.87,0.70);
+  sh.lineTo(0.86,1.00);
+  sh.lineTo(-1.80,1.00);
+  sh.quadraticCurveTo(-1.88,0.88,-1.87,0.70);
   sh.lineTo(-1.86,0.42);
   sh.quadraticCurveTo(-1.85,0.32,-1.76,0.31);
   sh.lineTo(-1.73,0.31); arch(-1.25,0.48); sh.lineTo(0.72,0.29); arch(1.20,0.48); sh.lineTo(1.82,0.31);
   const bg=new THREE.ExtrudeGeometry(sh,{depth:1.54,bevelEnabled:true,bevelThickness:0.1,bevelSize:0.08,bevelSegments:6,curveSegments:24});
-  bg.translate(0,0,-0.77);
-  body=new THREE.Mesh(bg,new THREE.MeshPhysicalMaterial({color:lin(0x1d4f91),metalness:0.45,roughness:0.32,clearcoat:1,clearcoatRoughness:0.08,transparent:true,opacity:0.09,depthWrite:false,side:THREE.DoubleSide}));
-  body.renderOrder=10; scene.add(body);
-  bodyEdges=new THREE.LineSegments(new THREE.EdgesGeometry(bg,30),new THREE.LineBasicMaterial({color:0x15202e,transparent:true,opacity:0.32}));
-  bodyEdges.renderOrder=11; scene.add(bodyEdges);
+  bg.translate(0,0,-0.77); shellPart(bg);
+  const rs=new THREE.Shape();
+  rs.moveTo(0.30,1.44); rs.quadraticCurveTo(-0.45,1.52,-1.30,1.46); rs.lineTo(-1.30,1.41); rs.quadraticCurveTo(-0.45,1.47,0.30,1.39); rs.lineTo(0.30,1.44);
+  const rg=new THREE.ExtrudeGeometry(rs,{depth:1.50,bevelEnabled:true,bevelThickness:0.08,bevelSize:0.02,bevelSegments:5,curveSegments:24});
+  rg.translate(0,0,-0.75); shellPart(rg);
+  const pillar=(a,b,r)=>{ const A=V(a),B=V(b),len=A.distanceTo(B);
+    const g=new THREE.CylinderGeometry(r,r,len,16); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),B.clone().sub(A).normalize())));
+    const mid=A.clone().add(B).multiplyScalar(0.5); g.translate(mid.x,mid.y,mid.z); shellPart(g); };
+  for(const s of [-1,1]){
+    pillar([0.94,1.05,s*0.80],[0.30,1.43,s*0.77],0.045);
+    pillar([-0.34,1.06,s*0.84],[-0.34,1.44,s*0.80],0.05);
+    pillar([-1.80,1.06,s*0.80],[-1.30,1.44,s*0.77],0.06);
+  }
+  scene.add(body); scene.add(bodyEdges);
   glass=new THREE.Group();
-  const gmat=new THREE.MeshPhysicalMaterial({color:lin(0x0c141d),roughness:0.04,metalness:0.1,transparent:true,opacity:0.62,depthWrite:false,envMapIntensity:1.6});
-  const gs=new THREE.Shape();
-  const G=[[0.78,1.07],[0.30,1.33],[-0.30,1.37],[-1.25,1.36],[-1.60,1.30],[-1.70,1.12],[-1.68,1.07]];
-  gs.moveTo(G[0][0],G[0][1]); for(let i=1;i<G.length;i++) gs.lineTo(G[i][0],G[i][1]);
-  const gg=new THREE.ExtrudeGeometry(gs,{depth:1.75,bevelEnabled:false}); gg.translate(0,0,-0.875);
-  glass.add(new THREE.Mesh(gg,gmat));
+  const gmat=new THREE.MeshPhysicalMaterial({color:lin(0xe8f1f8),roughness:0.03,metalness:0,transparent:true,opacity:0.16,depthWrite:false,envMapIntensity:1.2});
   const slab=(a,b,wd)=>{ const dx=b[0]-a[0], dy=b[1]-a[1], len=Math.hypot(dx,dy);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(len,0.012,wd),gmat); m.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,0); m.rotation.z=Math.atan2(dy,dx); glass.add(m); };
-  slab([0.98,1.085],[0.30,1.475],1.36);
-  slab([-1.49,1.48],[-1.79,1.30],1.22);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(len,0.01,wd),gmat); m.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,0); m.rotation.z=Math.atan2(dy,dx); glass.add(m); };
+  slab([0.94,1.05],[0.30,1.42],1.52);
+  slab([-1.30,1.42],[-1.80,1.05],1.50);
+  const ss=new THREE.Shape(); [[0.92,1.05],[0.32,1.40],[-1.29,1.41],[-1.78,1.05]].forEach((q,i)=>i?ss.lineTo(q[0],q[1]):ss.moveTo(q[0],q[1]));
+  for(const s of [-1,1]){ const sg=new THREE.ShapeGeometry(ss); const m=new THREE.Mesh(sg,gmat); m.material.side=THREE.DoubleSide; m.position.z=s*0.815; glass.add(m); }
   glass.visible=false; glass.children.forEach(m=>m.renderOrder=12); scene.add(glass);
   // exterior trim (not on the checklist): grille, plates, mirrors, handles
   exterior.push(box(null,[0.05,0.15,0.74],[1.975,0.50,0],0x15191e));
@@ -644,11 +677,14 @@ function buildCar(){
   const ring=new THREE.Mesh(new THREE.TorusGeometry(0.022,0.007,8,20),mat(0xf2c200)); ring.position.set(1.24,0.885,0.37); add("oil",ring);
   cyl("oil",0.028,0.025,[1.52,0.895,0.30],"y",0xf2c200);
   [-0.18,-0.06,0.06,0.18].forEach(dz=>{ cyl("plugs",0.026,0.07,[1.43,0.88,0.16+dz],"y",0x16191d); cyl("plugs",0.012,0.025,[1.43,0.925,0.16+dz],"y",K.red); });
+  [-0.18,-0.06,0.06,0.18].forEach(dz=>box("plugs",[0.03,0.025,0.03],[1.465,0.885,0.16+dz],0x3a3f45));
+  tube("plugs",[[1.48,0.885,-0.06],[1.49,0.885,0.16],[1.48,0.885,0.36],[1.40,0.92,0.42]],0.006,0xd9822b);
   cyl("pcv",0.02,0.05,[1.36,0.905,-0.02],"y",0x3d8b5a);
   tube("pcv",[[1.36,0.93,-0.02],[1.33,0.96,-0.06],[1.29,0.93,-0.09]],0.008,K.rubber);
   // accessory belt + pulleys
   cyl("belt",0.075,0.03,[1.45,0.34,0.425],"z",K.steel);
   cyl("belt",0.05,0.03,[1.52,0.60,0.425],"z",K.steel);
+  cyl("belt",0.06,0.07,[1.52,0.60,0.375],"z",K.alu,{metalness:0.5});
   cyl("belt",0.045,0.03,[1.30,0.76,0.425],"z",K.steel);
   cyl("belt",0.055,0.03,[1.58,0.38,0.425],"z",K.steel);
   tube("belt",[[1.45,0.262,0.43],[1.58,0.32,0.43],[1.64,0.38,0.43],[1.575,0.60,0.43],[1.52,0.655,0.43],[1.31,0.81,0.43],[1.25,0.76,0.43],[1.37,0.34,0.43]],0.012,K.belt,{},true);
@@ -665,6 +701,7 @@ function buildCar(){
   box("mounts",[0.10,0.06,0.08],[1.45,0.78,0.50],K.rubber);
   box("mounts",[0.04,0.04,0.16],[1.45,0.80,0.40],K.steel);
   cyl("mounts",0.045,0.06,[1.30,0.72,-0.38],"y",K.rubber);
+  [-0.02,0.10,0.22,0.34].forEach(z=>{ hexnut("mounts",[1.185,0.70,z],"x",0.016); hexnut("mounts",[1.185,0.62,z],"x",0.016); });
   // exhaust
   box("exhaust",[0.06,0.12,0.40],[1.22,0.66,0.16],K.rust);
   tube("exhaust",[[1.20,0.60,0.14],[1.16,0.38,0.08],[1.12,0.20,-0.05],[0.85,0.16,-0.30],[0.30,0.17,-0.35],[-0.30,0.18,-0.35],[-1.00,0.20,-0.35],[-1.45,0.26,-0.30]],0.028,K.rust);
@@ -761,6 +798,14 @@ function buildCar(){
     rod("shocks",[-1.40,0.52,s*0.55],[-1.42,0.68,s*0.55],0.012,K.alu);
   }
   cyl("rearaxle",0.045,1.10,[-1.18,0.30,0],"z",K.steel);
+  for(const s of [-1,1]){
+    hexnut("suspbolts",[1.17,0.92,s*0.54],"y",0.02);
+    hexnut("suspbolts",[1.22,0.24,s*0.27],"z",0.02);
+    hexnut("suspbolts",[0.98,0.24,s*0.29],"z",0.02);
+    hexnut("suspbolts",[-0.82,0.32,s*0.59],"z",0.022);
+    hexnut("suspbolts",[-1.35,0.28,s*0.59],"z",0.018);
+    hexnut("suspbolts",[-1.42,0.70,s*0.55],"y",0.018);
+  }
 
   /* A9 Steering */
   const sw=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.018,12,40),mat(0x1b1f24));
@@ -769,7 +814,9 @@ function buildCar(){
   { const c=sw.position, rt=new THREE.Vector3(1,0,0).applyQuaternion(sw.quaternion), up=new THREE.Vector3(0,1,0).applyQuaternion(sw.quaternion);
     for(const d of [rt,rt.clone().negate(),up.clone().negate()]){ const e=c.clone().add(d.multiplyScalar(0.165)); rod("steeringwheel",[c.x,c.y,c.z],[e.x,e.y,e.z],0.012,0x1b1f24); } }
   tube("steeringwheel",[[0.46,0.97,0.37],[0.64,0.88,0.37],[0.88,0.60,0.35],[0.98,0.40,0.30]],0.018,K.dark);
-  box("steeringwheel",[0.04,0.03,0.06],[0.62,0.86,0.44],K.dark);
+  box("tilt",[0.05,0.035,0.05],[0.64,0.86,0.42],K.dark);
+  rod("tilt",[0.64,0.85,0.44],[0.56,0.80,0.50],0.008,K.dark);
+  sphere("tilt",0.018,[0.555,0.797,0.505],0x111111);
   cyl("rack",0.035,0.90,[1.00,0.34,0],"z",K.steel);
   cyl("rack",0.045,0.12,[1.00,0.34,0.30],"z",K.rubber);
   for(const s of [-1,1]) rod("rack",[1.00,0.34,s*0.45],[1.08,0.33,s*0.55],0.014,K.steel);
@@ -794,8 +841,8 @@ function buildCar(){
   box("ac",[0.22,0.18,0.45],[0.84,0.62,-0.20],0x7d8794);
   tube("ac",[[1.58,0.44,0.27],[1.62,0.70,0.05],[1.79,0.72,-0.25]],0.011,K.alu);
   tube("ac",[[1.80,0.74,-0.28],[1.62,0.93,-0.36],[1.15,0.93,-0.32],[0.96,0.70,-0.25]],0.011,K.alu);
-  rod("wipers",[0.99,1.07,0.35],[0.78,1.20,-0.05],0.011,0x111111);
-  rod("wipers",[0.99,1.07,-0.25],[0.76,1.21,-0.60],0.011,0x111111);
+  rod("wipers",[0.95,1.075,0.35],[0.74,1.19,-0.05],0.011,0x111111);
+  rod("wipers",[0.95,1.075,-0.25],[0.72,1.20,-0.60],0.011,0x111111);
   box("wipers",[0.12,0.16,0.10],[1.66,0.62,-0.62],K.washer,{transparent:true,opacity:0.8});
   cyl("horn",0.06,0.03,[1.80,0.45,0.45],"x",K.red);
 
@@ -811,6 +858,11 @@ function buildCar(){
   box("chassis",[2.60,0.02,1.40],[-0.25,0.36,0],0x56606b);
   for(const s of [-1,1]) rod("chassis",[1.62,0.24,s*0.32],[0.95,0.24,s*0.32],0.03,0x4a535e);
   rod("chassis",[0.98,0.24,-0.34],[0.98,0.24,0.34],0.03,0x4a535e);
+  for(const s of [-1,1]){
+    hexnut("chassisbolts",[1.60,0.205,s*0.32],"y",0.022);
+    hexnut("chassisbolts",[0.97,0.205,s*0.32],"y",0.022);
+    for(const x of [0.40,-0.04]) hexnut("chassisbolts",[x,0.38,s*0.37+0.2],"y",0.016), hexnut("chassisbolts",[x,0.38,s*0.37-0.2],"y",0.016);
+  }
   box("latches",[0.05,0.05,0.08],[1.90,0.80,0],K.dark);
   box("latches",[0.04,0.05,0.10],[-1.955,0.74,0],K.dark);
   for(const s of [-1,1]){
@@ -852,11 +904,11 @@ function applyVisuals(){
   glass.visible = bodyMode==="solid";
   exterior.forEach(m=>{ m.visible = bodyMode==="solid"; });
   const solid = bodyMode==="solid";
-  if(body.material.transparent===solid){ body.material.transparent=!solid; body.material.needsUpdate=true; }
-  body.material.opacity = solid?1:(selected?0.04:0.09);
-  body.material.depthWrite = solid;
-  body.material.side = solid?THREE.FrontSide:THREE.DoubleSide;
-  bodyEdges.material.opacity = solid?0.15:(selected?0.18:0.32);
+  if(bodyMat.transparent===solid){ bodyMat.transparent=!solid; bodyMat.needsUpdate=true; }
+  bodyMat.opacity = solid?1:(selected?0.04:0.09);
+  bodyMat.depthWrite = solid;
+  bodyMat.side = THREE.DoubleSide;
+  edgeMat.opacity = solid?0.12:(selected?0.18:0.32);
 }
 function setBodyMode(m){
   bodyMode=m;
