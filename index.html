@@ -99,6 +99,13 @@ body.present .callout{font-size:21px;max-width:360px}
 body.present .callout .ck{font-size:14px}
 .linkrow input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;background:var(--panel)}
 .linkrow[hidden]{display:none}
+.baylabels{position:absolute;inset:0;pointer-events:none}
+.baylabels[hidden]{display:none}
+.bl{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;border:0;cursor:pointer;font:600 11px/1.15 var(--font-body);padding:3px 7px;border-radius:5px;color:#15202e;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35);margin-top:-7px}
+.bl::after{content:"";position:absolute;left:50%;bottom:-7px;width:2px;height:7px;background:inherit;transform:translateX(-50%)}
+.bl:hover{outline:2px solid #fff}
+body.present .bl{font-size:14px;padding:4px 9px}
+.toolbar .seg{flex-wrap:wrap}
 .err{position:absolute;inset:0;display:none;place-items:center;padding:24px;text-align:center;color:var(--muted)}
 @media (max-width:820px){
   .app{grid-template-columns:1fr;grid-template-rows:52% 48%}
@@ -119,19 +126,25 @@ body.present .callout .ck{font-size:14px}
     <div class="toolbar">
       <div class="seg" role="group" aria-label="Body shell">
         <span class="lbl">Body</span>
-        <button id="mode-solid" data-mode="solid" aria-pressed="false">Solid</button>
         <button id="mode-xray" data-mode="xray" aria-pressed="true">X-ray</button>
         <button id="mode-hidden" data-mode="hidden" aria-pressed="false">Hidden</button>
       </div>
+      <div class="seg" role="group" aria-label="Bonnet">
+        <span class="lbl">Bonnet</span>
+        <button id="bonnet-closed" data-bonnet="closed" aria-pressed="true">Closed</button>
+        <button id="bonnet-open" data-bonnet="open" aria-pressed="false">Open</button>
+        <button id="bay-labels" aria-pressed="true" title="Show labels on the engine bay parts">Labels</button>
+      </div>
       <div class="seg" role="group" aria-label="Camera view">
         <span class="lbl">View</span>
+        <button id="view-bay" data-view="bay">Engine bay</button>
         <button id="view-front" data-view="front">Front ¾</button>
         <button id="view-side" data-view="side">Driver side</button>
         <button id="view-top" data-view="top">Top</button>
         <button id="view-under" data-view="under">Underside</button>
       </div>
     </div>
-    <div class="hint">Drag to rotate · scroll to zoom · right-drag to pan · ← → or clicker to step through parts</div>
+    <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step through parts · B opens the bonnet · P presents</div>
     <div class="nav" role="group" aria-label="Step through parts">
       <button id="prev" aria-label="Previous part">‹ Prev</button>
       <span id="pos">Overview</span>
@@ -141,6 +154,7 @@ body.present .callout .ck{font-size:14px}
     </div>
     <svg class="lead" id="lead" aria-hidden="true"><line id="leadLine"></line><circle id="leadDot" r="6"></circle></svg>
     <div class="callout" id="callout" aria-hidden="true"><span class="ck" id="cSec"></span><span id="cName"></span></div>
+    <div class="baylabels" id="bayLabels" aria-label="Engine bay labels"></div>
     <div class="tip" id="tip"></div>
     <div class="err" id="err">The 3D view needs WebGL, which this browser has turned off. The parts list on the right still works.</div>
   </main>
@@ -218,7 +232,7 @@ const PARTS = [
   what:"Rubber hoses link the radiator, engine and cabin heater.",
   check:"Squeeze them when cold: firm, not soft, swollen or cracked. Clamps dry.",
   signs:"Coolant puddle, steam from under the bonnet."},
- {id:"radiator",s:"A1",n:"Radiator & cooling fan",who:"DIY check",
+ {id:"radiator",s:"A1",n:"Radiator, cap & cooling fan",who:"DIY check",
   what:"Thin fins pass engine heat to the air. The electric fan pulls air through when the car is slow or stopped.",
   check:"Fins free of leaves and mud, no leaks at the side tanks, fan runs when hot or with AC on.",
   signs:"Overheats in traffic but fine on the highway (usually the fan)."},
@@ -230,7 +244,7 @@ const PARTS = [
   what:"Manifold, catalytic converter and silencer carry exhaust gas to the rear and cut noise and emissions.",
   check:"Black soot marks at joints (leaks), loose rubber hangers, rust holes.",
   signs:"Louder exhaust, rattle underneath, exhaust smell in the cabin."},
- {id:"pcv",s:"A1",n:"PCV / EGR valve",who:"Garage",
+ {id:"pcv",s:"A1",n:"EGR valve & PCV valve",who:"Garage",
   what:"PCV vents gases from inside the engine back into the intake. EGR recirculates a little exhaust to cut emissions.",
   check:"Hoses not cracked, valve not clogged with sludge.",
   signs:"Rough idle, oil leaks from seals, check-engine codes."},
@@ -242,6 +256,10 @@ const PARTS = [
   what:"Paper filter element that stops dust getting into the engine.",
   check:"Hold it to the light; tap out dust; replace if dark or clogged. Dusty city roads wear it faster.",
   signs:"Sluggish pickup, worse mileage."},
+ {id:"maf",s:"A3",n:"MAF sensor & intake duct",who:"DIY check, garage fix",
+  what:"The mass air flow (MAF) sensor sits in the duct after the air filter and measures how much air the engine breathes in.",
+  check:"Duct clamps tight and the rubber duct not cracked; connector clipped on the sensor.",
+  signs:"Check-engine light, hesitation or rough idle. A dirty filter can foul the sensor."},
  {id:"fueltank",s:"A3",n:"Fuel tank, cap & fuel lines",who:"Garage",
   what:"Tank under the rear seat; steel and plastic lines carry petrol forward to the injectors.",
   check:"Cap seals and clicks shut; no wet patches or petrol smell along the lines.",
@@ -366,8 +384,8 @@ const PARTS = [
   what:"Belt-driven compressor, a condenser in front of the radiator, and an evaporator with blower behind the dashboard.",
   check:"Cold air in both fresh-air and recirculation modes, every blower speed, clean condenser fins and cabin filter.",
   signs:"Weak cooling, musty smell, noise when the AC switches on."},
- {id:"wipers",s:"A10",n:"Wipers & washer",who:"DIY",
-  what:"Clear the windscreen; the reservoir feeds the washer jets.",
+ {id:"wipers",s:"A10",n:"Wipers, washer reservoir & nozzles",who:"DIY",
+  what:"Wiper arms and blades clear the windscreen. The washer reservoir (blue cap, front corner of the engine bay) feeds the nozzles on the cowl.",
   check:"Blades wipe without streaks; reservoir full; jets aimed at the glass.",
   signs:"Streaks, chattering, squeaking."},
  {id:"horn",s:"A10",n:"Horn",who:"DIY check",
@@ -386,6 +404,14 @@ const PARTS = [
   what:"Bolts that hold the subframe and seats to the body. Highlighted in gold on the model.",
   check:"Tighten to the specified torque; look for rust or missing bolts.",
   signs:"Knocks or rattles from under the car, seats that shift."},
+ {id:"bonnet",s:"A11",n:"Bonnet, prop rod & rubber stops",who:"DIY",
+  what:"The bonnet covers the engine bay. Lift it, then rest it on the prop rod. The rubber stops cushion it when closed.",
+  check:"Rod clips in securely; bonnet closes evenly and latches at the first push.",
+  signs:"Bonnet rattles at speed, sits unevenly, or won't latch."},
+ {id:"cowl",s:"A11",n:"Cowl top",who:"DIY",
+  what:"The vented plastic panel below the windscreen. Fresh air for the cabin enters through it; the wiper pivots and washer nozzles sit here.",
+  check:"Vents clear of leaves; drain holes underneath not blocked.",
+  signs:"Water in the footwell, musty AC smell."},
  {id:"latches",s:"A11",n:"Latches, hinges & locks",who:"DIY",
   what:"Bonnet latch, door hinges, door locks and the hatch latch.",
   check:"Everything opens, closes and locks smoothly. Lubricate the hinges.",
@@ -399,7 +425,7 @@ const PARTS = [
   check:"Every warning light glows at key-on and goes out once the engine starts.",
   signs:"Red means stop (oil pressure, temperature, brakes). Amber means get it checked soon (engine, ABS, airbag)."}
 ];
-const SHEET={"engine": "Whole engine", "belt": "1a", "coolant": "1b", "oil": "1c", "hoses": "1d", "radiator": "1e", "mounts": "1f", "exhaust": "1g", "pcv": "1h", "plugs": "2a", "airfilter": "3a", "fueltank": "3b", "fuelfilter": "3c", "clutchpedal": "4a", "clutchfluid": "4b", "gearbox": "4c", "gearlever": "4d", "driveshaft": "5a", "cvboot": "5b", "brakefluid": "6a, 6e", "brakepedal": "6b", "parking": "6c", "discs": "6d, 6e", "drums": "6e", "brakelines": "6f", "tyres": "7a", "wheels": "7b", "bearings": "7c", "struts": "8a", "arms": "8b", "rearaxle": "8b", "springs": "8c", "shocks": "8d", "suspbolts": "8e", "steeringwheel": "9a", "rack": "9b", "tilt": "9c", "battery": "10a", "alternator": "Extra", "harness": "10b", "lights": "10c", "ac": "10d", "wipers": "10e", "horn": "10f", "seats": "11a", "chassis": "11b", "chassisbolts": "11b", "latches": "11c", "obd": "Extra", "cluster": "Extra"};
+const SHEET={"engine": "Whole engine", "belt": "1a", "coolant": "1b", "oil": "1c", "hoses": "1d", "radiator": "1e", "mounts": "1f", "exhaust": "1g", "pcv": "1h", "plugs": "2a", "airfilter": "3a", "fueltank": "3b", "fuelfilter": "3c", "clutchpedal": "4a", "clutchfluid": "4b", "gearbox": "4c", "gearlever": "4d", "driveshaft": "5a", "cvboot": "5b", "brakefluid": "6a, 6e", "brakepedal": "6b", "parking": "6c", "discs": "6d, 6e", "drums": "6e", "brakelines": "6f", "tyres": "7a", "wheels": "7b", "bearings": "7c", "struts": "8a", "arms": "8b", "rearaxle": "8b", "springs": "8c", "shocks": "8d", "suspbolts": "8e", "steeringwheel": "9a", "rack": "9b", "tilt": "9c", "battery": "10a", "alternator": "Extra", "harness": "10b", "lights": "10c", "ac": "10d", "wipers": "10e", "horn": "10f", "seats": "11a", "maf": "Extra", "bonnet": "Extra", "cowl": "Extra", "chassis": "11b", "chassisbolts": "11b", "latches": "11c", "obd": "Extra", "cluster": "Extra"};
 const BY_ID = Object.fromEntries(PARTS.map(p=>[p.id,p]));
 
 /* ---------- Checked state (this browser only) ---------- */
@@ -482,7 +508,10 @@ catch(e){ document.getElementById("err").style.display="grid"; }
 const ACCENT=0xf08a00;
 const comps={}; PARTS.forEach(p=>comps[p.id]={meshes:[]});
 const pickables=[], neutral=[];
-let scene,camera,controls,body,bodyEdges,glass,bodyMat,edgeMat;
+let scene,camera,controls,body,bodyEdges,glass,bodyMat,edgeMat,bonnetMat,bonnetPivot,bonnetRod;
+const HINGE=[0.975,1.045], BONNET_ANGLE=1.1;
+let bonnetOpen=false, bayLabelsOn=true;
+const bayPlanes=[new THREE.Plane(new THREE.Vector3(0,-1,0),0.79), new THREE.Plane(new THREE.Vector3(-1,0,0),0.985)];
 const exterior=[];
 let focusCenter=null;
 function stripes(a,b,n){
@@ -506,12 +535,14 @@ function select(id, fly){
   showDetail(selected);
   try{
     if(selected){ if(location.hash!=="#"+selected) location.replace("#"+selected); }
+    else if(bonnetOpen){ if(location.hash!=="#engine-bay") location.replace("#engine-bay"); }
     else if(location.hash){ history.replaceState(null,"",location.pathname+location.search); }
   }catch(err){}
   document.getElementById("linkRow").hidden=true;
   if(selected){
     itemEls[selected].scrollIntoView({block:"nearest"});
-    if(bodyMode==="solid") setBodyMode("xray");
+    if(selected==="bonnet" && !bonnetOpen) setBonnet(true,false);
+    if(bodyMode==="solid" && !bonnetOpen) setBodyMode("xray");
     if(renderer) focusComp(selected);
   }
   applyVisuals();
@@ -523,7 +554,7 @@ function init(){
   renderer.setClearColor(0xdfe5ea);
   renderer.outputEncoding=THREE.sRGBEncoding;
   renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
-  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled=true; renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0xdfe5ea);
   scene.fog=new THREE.Fog(0xdfe5ea,10,22);
@@ -549,6 +580,7 @@ function init(){
   const grid=new THREE.GridHelper(12,24,0xaeb8c3,0xbfc8d1); grid.material.transparent=true; grid.material.opacity=0.45; grid.position.y=0.001; scene.add(grid);
 
   buildCar();
+  bonnetPivot.visible=false; bonnetRod.visible=false;
   scene.traverse(o=>{ if(o.isMesh && o!==ground && o.parent!==glass) o.castShadow=true; });
   buildList();
   applyVisuals();
@@ -673,13 +705,16 @@ function buildCar(){
   box("oil",[0.32,0.12,0.44],[1.43,0.30,0.16],0x2f363f);
   cyl("oil",0.045,0.12,[1.24,0.46,0.30],"x",0x2f6db5);
   cyl("oil",0.018,0.03,[1.43,0.23,0.28],"y",K.alu);
-  rod("oil",[1.26,0.45,0.36],[1.24,0.87,0.37],0.006,K.alu);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.022,0.007,8,20),mat(0xf2c200)); ring.position.set(1.24,0.885,0.37); add("oil",ring);
+  rod("oil",[1.59,0.45,0.37],[1.585,0.86,0.37],0.006,K.alu);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.022,0.007,8,20),mat(0xf2c200)); ring.position.set(1.585,0.88,0.37); add("oil",ring);
   cyl("oil",0.028,0.025,[1.52,0.895,0.30],"y",0xf2c200);
   [-0.18,-0.06,0.06,0.18].forEach(dz=>{ cyl("plugs",0.026,0.07,[1.43,0.88,0.16+dz],"y",0x16191d); cyl("plugs",0.012,0.025,[1.43,0.925,0.16+dz],"y",K.red); });
   [-0.18,-0.06,0.06,0.18].forEach(dz=>box("plugs",[0.03,0.025,0.03],[1.465,0.885,0.16+dz],0x3a3f45));
   tube("plugs",[[1.48,0.885,-0.06],[1.49,0.885,0.16],[1.48,0.885,0.36],[1.40,0.92,0.42]],0.006,0xd9822b);
   cyl("pcv",0.02,0.05,[1.36,0.905,-0.02],"y",0x3d8b5a);
+  cyl("pcv",0.032,0.07,[1.63,0.78,-0.08],"x",0xb9c1c9,{metalness:0.7,roughness:0.3});
+  box("pcv",[0.04,0.04,0.04],[1.63,0.83,-0.08],0x2a2f35);
+  tube("pcv",[[1.63,0.75,-0.08],[1.65,0.70,-0.04],[1.65,0.62,0.0]],0.012,0xb9c1c9,{metalness:0.7});
   tube("pcv",[[1.36,0.93,-0.02],[1.33,0.96,-0.06],[1.29,0.93,-0.09]],0.008,K.rubber);
   // accessory belt + pulleys
   cyl("belt",0.075,0.03,[1.45,0.34,0.425],"z",K.steel);
@@ -690,28 +725,37 @@ function buildCar(){
   tube("belt",[[1.45,0.262,0.43],[1.58,0.32,0.43],[1.64,0.38,0.43],[1.575,0.60,0.43],[1.52,0.655,0.43],[1.31,0.81,0.43],[1.25,0.76,0.43],[1.37,0.34,0.43]],0.012,K.belt,{},true);
   // cooling
   box("radiator",[0.05,0.38,0.62],[1.74,0.55,0],0xffffff,{metalness:0.5,map:stripes("#6f7c88","#9aa6b1",48)});
-  cyl("radiator",0.15,0.04,[1.69,0.55,0],"x",K.rubber);
+  cyl("radiator",0.15,0.03,[1.705,0.55,0],"x",K.rubber);
+  cyl("radiator",0.018,0.04,[1.74,0.76,-0.22],"y",K.alu);
+  cyl("radiator",0.03,0.02,[1.74,0.785,-0.22],"y",0x1b1f24);
+  cyl("radiator",0.012,0.004,[1.74,0.797,-0.22],"y",0xf2c200);
   tube("hoses",[[1.74,0.70,0.22],[1.68,0.80,0.24],[1.60,0.84,0.24]],0.022,K.rubber);
   tube("hoses",[[1.74,0.40,-0.22],[1.67,0.34,-0.10],[1.62,0.42,0.05]],0.022,K.rubber);
   tube("hoses",[[1.27,0.78,0.30],[1.15,0.86,0.12],[0.98,0.84,0.08]],0.016,K.rubber);
-  box("coolant",[0.12,0.14,0.10],[1.66,0.80,0.60],K.fluidCool,{transparent:true,opacity:0.8});
-  cyl("coolant",0.03,0.02,[1.66,0.88,0.60],"y",0x222222);
-  tube("coolant",[[1.66,0.74,0.55],[1.72,0.72,0.40],[1.74,0.72,0.30]],0.008,K.rubber);
+  box("coolant",[0.14,0.14,0.12],[1.58,0.80,-0.36],K.fluidCool,{transparent:true,opacity:0.85});
+  cyl("coolant",0.032,0.025,[1.58,0.885,-0.36],"y",0x1b1f24);
+  tube("coolant",[[1.62,0.75,-0.32],[1.70,0.74,-0.26],[1.74,0.74,-0.18]],0.008,K.rubber);
   // mounts
   box("mounts",[0.10,0.06,0.08],[1.45,0.78,0.50],K.rubber);
   box("mounts",[0.04,0.04,0.16],[1.45,0.80,0.40],K.steel);
   cyl("mounts",0.045,0.06,[1.30,0.72,-0.38],"y",K.rubber);
-  [-0.02,0.10,0.22,0.34].forEach(z=>{ hexnut("mounts",[1.185,0.70,z],"x",0.016); hexnut("mounts",[1.185,0.62,z],"x",0.016); });
+  [-0.04,0.08,0.20,0.32].forEach(z=>{ hexnut("mounts",[1.615,0.835,z],"x",0.015); hexnut("mounts",[1.615,0.775,z],"x",0.015); });
   // exhaust
-  box("exhaust",[0.06,0.12,0.40],[1.22,0.66,0.16],K.rust);
-  tube("exhaust",[[1.20,0.60,0.14],[1.16,0.38,0.08],[1.12,0.20,-0.05],[0.85,0.16,-0.30],[0.30,0.17,-0.35],[-0.30,0.18,-0.35],[-1.00,0.20,-0.35],[-1.45,0.26,-0.30]],0.028,K.rust);
+  [-0.18,-0.06,0.06,0.18].forEach(dz=>tube("exhaust",[[1.60,0.80,0.16+dz],[1.65,0.74,0.16+dz],[1.66,0.62,0.16+dz*0.4],[1.66,0.52,0.15]],0.021,K.rust));
+  cyl("exhaust",0.035,0.08,[1.66,0.50,0.15],"y",K.rust);
+  tube("exhaust",[[1.66,0.47,0.15],[1.67,0.35,0.08],[1.58,0.18,-0.05],[1.20,0.15,-0.25],[0.85,0.16,-0.30],[0.30,0.17,-0.35],[-0.30,0.18,-0.35],[-1.00,0.20,-0.35],[-1.45,0.26,-0.30]],0.028,K.rust);
   cyl("exhaust",0.07,0.32,[0.55,0.17,-0.35],"x",K.alu);
   cyl("exhaust",0.12,0.46,[-1.62,0.30,-0.12],"z",K.alu);
   tube("exhaust",[[-1.60,0.26,-0.33],[-1.80,0.26,-0.40],[-1.98,0.25,-0.42]],0.024,K.rust);
 
   /* A3 Fuel & air */
-  box("airfilter",[0.20,0.12,0.20],[1.60,0.82,-0.22],0x23282e);
-  tube("airfilter",[[1.50,0.84,-0.12],[1.36,0.92,-0.06],[1.27,0.88,0.00]],0.035,0x23282e);
+  box("airfilter",[0.22,0.10,0.32],[1.12,0.92,-0.05],0x23282e,{roughness:0.7});
+  box("airfilter",[0.18,0.012,0.28],[1.12,0.975,-0.05],0x30363d,{roughness:0.7});
+  tube("airfilter",[[1.20,0.90,0.08],[1.25,0.87,0.10],[1.28,0.85,0.10]],0.03,0x23282e);
+  tube("maf",[[1.12,0.92,-0.21],[1.16,0.91,-0.27]],0.035,0x23282e);
+  cyl("maf",0.042,0.08,[1.18,0.91,-0.31],"z",0x15191e);
+  box("maf",[0.04,0.03,0.04],[1.18,0.96,-0.31],0x2f3640);
+  tube("maf",[[1.19,0.91,-0.35],[1.27,0.88,-0.38],[1.40,0.85,-0.38]],0.04,0x1b1f24,{roughness:0.85});
   box("fueltank",[0.55,0.14,0.70],[-0.60,0.27,0.23],0x2a3038);
   tube("fueltank",[[-0.33,0.28,0.50],[0.90,0.30,0.55],[1.05,0.45,0.48],[1.22,0.80,0.32],[1.27,0.90,0.30]],0.008,K.alu);
   tube("fueltank",[[-0.85,0.32,-0.08],[-1.00,0.50,-0.50],[-1.12,0.80,-0.82]],0.03,K.dark);
@@ -725,7 +769,7 @@ function buildCar(){
   cyl("gearbox",0.015,0.02,[1.36,0.345,-0.36],"y",0xf2c200);
   box("clutchfluid",[0.06,0.06,0.06],[1.08,0.86,0.20],K.fluidBrake,{transparent:true,opacity:0.85});
   cyl("clutchfluid",0.022,0.12,[1.03,0.80,0.22],"x",K.alu);
-  tube("clutchfluid",[[1.08,0.80,0.22],[1.10,0.95,0.05],[1.12,0.86,-0.10],[1.18,0.62,-0.16]],0.007,K.dark);
+  tube("clutchfluid",[[1.08,0.80,0.22],[1.14,0.78,0.05],[1.18,0.70,-0.08],[1.18,0.62,-0.16]],0.007,K.dark);
   rod("clutchpedal",[0.86,0.42,0.22],[0.92,0.68,0.22],0.012,K.dark);
   box("clutchpedal",[0.02,0.08,0.07],[0.86,0.42,0.22],K.rubber);
   rod("gearlever",[0.58,0.48,0.05],[0.52,0.74,0.05],0.012,K.dark);
@@ -822,14 +866,15 @@ function buildCar(){
   for(const s of [-1,1]) rod("rack",[1.00,0.34,s*0.45],[1.08,0.33,s*0.55],0.014,K.steel);
 
   /* A10 Electrical */
-  box("battery",[0.20,0.18,0.15],[1.55,0.80,-0.52],0x2b2f36);
-  box("battery",[0.205,0.025,0.155],[1.55,0.88,-0.52],0x4a525c);
-  cyl("battery",0.015,0.03,[1.49,0.90,-0.48],"y",K.red);
-  cyl("battery",0.015,0.03,[1.61,0.90,-0.48],"y",0x111111);
+  box("battery",[0.20,0.18,0.15],[1.42,0.80,-0.55],0x2b2f36);
+  box("battery",[0.205,0.025,0.155],[1.42,0.88,-0.55],0x4a525c);
+  box("battery",[0.05,0.035,0.05],[1.36,0.905,-0.51],K.red);
+  box("battery",[0.05,0.035,0.05],[1.48,0.905,-0.51],K.red);
   cyl("alternator",0.07,0.10,[1.30,0.76,0.36],"z",K.alu,{metalness:0.5});
-  box("harness",[0.10,0.08,0.10],[1.70,0.82,-0.42],0x30363d);
-  tube("harness",[[1.66,0.84,-0.42],[1.40,0.95,-0.30],[1.30,0.95,0.00],[1.25,0.95,0.30],[1.10,0.95,0.50],[0.98,0.90,0.60]],0.012,0x2f3640);
-  tube("harness",[[1.72,0.82,-0.46],[1.80,0.74,-0.52]],0.01,0x2f3640);
+  box("harness",[0.10,0.08,0.10],[1.24,0.84,-0.70],0x30363d);
+  tube("harness",[[1.26,0.84,-0.64],[1.30,0.93,-0.30],[1.30,0.95,0.00],[1.25,0.95,0.30],[1.10,0.95,0.50],[0.98,0.90,0.60]],0.012,0x2f3640);
+  tube("harness",[[1.27,0.84,-0.66],[1.60,0.84,-0.64],[1.84,0.72,-0.55]],0.01,0x2f3640);
+  tube("harness",[[1.48,0.93,-0.05],[1.56,0.90,0.10],[1.58,0.86,0.30]],0.008,0x2f3640);
   tube("harness",[[1.25,0.95,0.30],[1.50,0.90,0.50],[1.80,0.74,0.52]],0.01,0x2f3640);
   tube("harness",[[0.98,0.90,0.60],[0.90,0.45,0.70],[-1.00,0.42,0.72],[-1.75,0.92,0.66]],0.01,0x2f3640);
   for(const s of [-1,1]){
@@ -839,11 +884,15 @@ function buildCar(){
   box("ac",[0.02,0.36,0.60],[1.80,0.55,0],0xffffff,{metalness:0.5,map:stripes("#8593a0","#b4bec8",56)});
   cyl("ac",0.06,0.14,[1.58,0.38,0.33],"z",K.alu,{metalness:0.5});
   box("ac",[0.22,0.18,0.45],[0.84,0.62,-0.20],0x7d8794);
-  tube("ac",[[1.58,0.44,0.27],[1.62,0.70,0.05],[1.79,0.72,-0.25]],0.011,K.alu);
-  tube("ac",[[1.80,0.74,-0.28],[1.62,0.93,-0.36],[1.15,0.93,-0.32],[0.96,0.70,-0.25]],0.011,K.alu);
+  tube("ac",[[1.58,0.44,0.27],[1.64,0.62,0.46],[1.79,0.70,0.26]],0.012,K.alu,{metalness:0.8,roughness:0.25});
+  tube("ac",[[1.80,0.72,0.29],[1.56,0.84,0.42],[1.32,0.86,0.44],[1.12,0.70,0.40],[0.98,0.58,0.36]],0.012,K.alu,{metalness:0.8,roughness:0.25});
   rod("wipers",[0.95,1.075,0.35],[0.74,1.19,-0.05],0.011,0x111111);
   rod("wipers",[0.95,1.075,-0.25],[0.72,1.20,-0.60],0.011,0x111111);
-  box("wipers",[0.12,0.16,0.10],[1.66,0.62,-0.62],K.washer,{transparent:true,opacity:0.8});
+  box("wipers",[0.12,0.16,0.10],[1.66,0.62,0.62],0xeef3f7,{transparent:true,opacity:0.85});
+  cyl("wipers",0.032,0.025,[1.66,0.71,0.62],"y",0x2f7fd0);
+  for(const z of [0.30,-0.30]){ cyl("wipers",0.012,0.02,[1.00,1.075,z],"y",0x111111); }
+  rod("wipers",[0.80,1.17,0.08],[0.70,1.23,-0.18],0.006,0x222222);
+  rod("wipers",[0.78,1.18,-0.47],[0.68,1.24,-0.72],0.006,0x222222);
   cyl("horn",0.06,0.03,[1.80,0.45,0.45],"x",K.red);
 
   /* A11 Body */
@@ -863,13 +912,32 @@ function buildCar(){
     hexnut("chassisbolts",[0.97,0.205,s*0.32],"y",0.022);
     for(const x of [0.40,-0.04]) hexnut("chassisbolts",[x,0.38,s*0.37+0.2],"y",0.016), hexnut("chassisbolts",[x,0.38,s*0.37-0.2],"y",0.016);
   }
-  box("latches",[0.05,0.05,0.08],[1.90,0.80,0],K.dark);
+  box("latches",[0.05,0.06,0.10],[1.81,0.76,0],K.dark);
   box("latches",[0.04,0.05,0.10],[-1.955,0.74,0],K.dark);
   for(const s of [-1,1]){
     cyl("latches",0.02,0.07,[0.93,0.95,s*0.855],"y",K.steel);
     cyl("latches",0.02,0.07,[0.93,0.62,s*0.855],"y",K.steel);
     box("latches",[0.04,0.06,0.03],[-0.30,0.90,s*0.855],K.steel);
   }
+
+  /* Bonnet (opens about a hinge near the windscreen), prop rod, rubber stops, cowl */
+  bonnetMat=new THREE.MeshPhysicalMaterial({color:lin(0x1d4f91),metalness:0.45,roughness:0.32,clearcoat:1,clearcoatRoughness:0.08,side:THREE.DoubleSide,transparent:true,opacity:0.3,depthWrite:false});
+  { const q=(t)=>{ const a=[1.76,0.80],c=[1.35,0.92],b=[0.95,0.98],u=1-t;
+      const x=u*u*a[0]+2*u*t*c[0]+t*t*b[0], y=u*u*a[1]+2*u*t*c[1]+t*t*b[1];
+      const dx=2*u*(c[0]-a[0])+2*t*(b[0]-c[0]), dy=2*u*(c[1]-a[1])+2*t*(b[1]-c[1]), L=Math.hypot(dx,dy);
+      return [x-dy/L*0.08*Math.sign(-dx), y+dx/L*0.08*Math.sign(-dx)]; };
+    const top=[],bot=[]; for(let i=0;i<=16;i++){ const p=q(i/16); top.push(p); bot.push([p[0],p[1]-0.025]); }
+    const bs=new THREE.Shape(); bs.moveTo(top[0][0],top[0][1]); top.slice(1).forEach(p=>bs.lineTo(p[0],p[1])); bot.reverse().forEach(p=>bs.lineTo(p[0],p[1]));
+    const bgeo=new THREE.ExtrudeGeometry(bs,{depth:1.56,bevelEnabled:true,bevelThickness:0.04,bevelSize:0.01,bevelSegments:3});
+    bgeo.translate(-HINGE[0],-HINGE[1],-0.78);
+    bonnetPivot=new THREE.Group(); bonnetPivot.position.set(HINGE[0],HINGE[1],0); bonnetPivot.rotation.z=BONNET_ANGLE; scene.add(bonnetPivot);
+    const panel=new THREE.Mesh(bgeo,bonnetMat); add("bonnet",panel); bonnetPivot.add(panel);
+    const under=new THREE.Mesh(boxGeo(0.62,0.02,1.30),mat(0x2b3138,{roughness:0.9})); under.position.set(0.42,-0.065,0); add("bonnet",under); bonnetPivot.add(under);
+    const tip=new THREE.Vector3(0.55,-0.07,0).applyAxisAngle(new THREE.Vector3(0,0,1),BONNET_ANGLE).add(new THREE.Vector3(HINGE[0],HINGE[1],0.5));
+    bonnetRod=rod("bonnet",[1.74,0.76,0.62],[tip.x,tip.y,tip.z],0.008,0x2a2f35);
+  }
+  for(const s of [-1,1]) cyl("bonnet",0.022,0.03,[1.76,0.77,s*0.62],"y",0x111111);
+  box("cowl",[0.13,0.018,1.46],[0.985,1.045,0],0xffffff,{map:stripes("#1e2328","#3a4149",70),roughness:0.8});
 
   /* B Cabin & diagnostics */
   box("obd",[0.05,0.035,0.07],[0.70,0.62,0.50],0x111111);
@@ -910,6 +978,50 @@ function applyVisuals(){
   bodyMat.side = THREE.DoubleSide;
   edgeMat.opacity = solid?0.12:(selected?0.18:0.32);
 }
+function setBonnet(open,fly){
+  bonnetOpen=open;
+  document.querySelectorAll("[data-bonnet]").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.bonnet==="open")===open?"true":"false"));
+  if(!scene) return;
+  bonnetPivot.visible=open; bonnetRod.visible=open;
+  for(const m of [bodyMat,edgeMat]){ m.clippingPlanes=open?bayPlanes:null; m.clipIntersection=true; m.needsUpdate=true; }
+  if(fly){ const v=VIEWS.bay; flyTo(V(v[1]),V(v[0])); }
+  try{
+    if(open && !selected && location.hash!=="#engine-bay") location.replace("#engine-bay");
+    if(!open && location.hash==="#engine-bay") history.replaceState(null,"",location.pathname+location.search);
+  }catch(err){}
+  applyVisuals();
+}
+document.querySelectorAll("[data-bonnet]").forEach(b=>b.addEventListener("click",()=>{
+  const open=b.dataset.bonnet==="open"; if(open===bonnetOpen) return;
+  if(!open && selected==="bonnet") select(null);
+  setBonnet(open,open);
+}));
+document.getElementById("bay-labels").addEventListener("click",e=>{ bayLabelsOn=!bayLabelsOn; e.currentTarget.setAttribute("aria-pressed",bayLabelsOn?"true":"false"); });
+const BAY=[
+ ["Bonnet","bonnet",[1.05,1.62,0.0],"#e8473d"],["Bonnet rod","bonnet",[1.50,1.10,0.55],"#7cc4f5"],
+ ["Wiper arm","wipers",[0.80,1.17,0.08],"#a8e26b"],["Washer nozzle","wipers",[1.00,1.09,0.30],"#f49ac2"],
+ ["Cowl top","cowl",[0.99,1.06,-0.40],"#f5a443"],["Strut mount","struts",[1.17,0.93,-0.54],"#f5a443"],
+ ["Brake oil reservoir","brakefluid",[1.12,0.90,0.42],"#f6dc3b"],["Air filter box","airfilter",[1.12,0.98,-0.05],"#f49ac2"],
+ ["MAF sensor","maf",[1.18,0.95,-0.31],"#7cc4f5"],["Battery","battery",[1.42,0.92,-0.55],"#e8473d"],
+ ["Spark plugs","plugs",[1.43,0.94,0.04],"#3d6ee8"],["Engine oil cap","oil",[1.52,0.91,0.30],"#f6dc3b"],
+ ["Oil dipstick","oil",[1.585,0.89,0.37],"#f5a443"],["Coolant reservoir","coolant",[1.58,0.89,-0.36],"#f49ac2"],
+ ["Radiator cap","radiator",[1.74,0.80,-0.22],"#a8e26b"],["EGR valve","pcv",[1.63,0.85,-0.08],"#f6dc3b"],
+ ["Exhaust manifold","exhaust",[1.65,0.70,0.18],"#f49ac2"],["Engine wiring","harness",[1.30,0.93,-0.30],"#e8473d"],
+ ["AC pipe","ac",[1.56,0.84,0.42],"#f49ac2"],["Engine mount","mounts",[1.45,0.81,0.50],"#c69cf2"],
+ ["Washer fluid reservoir","wipers",[1.66,0.73,0.62],"#a8e26b"],["Bonnet rubber","bonnet",[1.76,0.79,0.62],"#f6dc3b"],
+ ["Bonnet lock","latches",[1.81,0.79,0.0],"#7cc4f5"],["Headlight","lights",[1.92,0.74,0.55],"#e8473d"]
+];
+const bayEl=document.getElementById("bayLabels"), bayBtns=[];
+BAY.forEach(([t,id,p,c])=>{ const b=document.createElement("button"); b.className="bl"; b.type="button"; b.textContent=t; b.style.background=c; if(c==="#3d6ee8") b.style.color="#fff";
+  b.addEventListener("click",()=>select(id,true)); bayEl.appendChild(b); bayBtns.push([b,V(p)]); });
+function updateBayLabels(){
+  const show=bonnetOpen && bayLabelsOn && !selected && !tween;
+  bayEl.hidden=!show; if(!show) return;
+  const w=stage.clientWidth,h=stage.clientHeight;
+  for(const [b,p] of bayBtns){ const v=p.clone().project(camera);
+    if(v.z>1||Math.abs(v.x)>1||Math.abs(v.y)>1){ b.style.display="none"; continue; }
+    b.style.display="block"; b.style.left=((v.x+1)/2*w)+"px"; b.style.top=((1-v.y)/2*h)+"px"; }
+}
 function setBodyMode(m){
   bodyMode=m;
   document.querySelectorAll("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===m?"true":"false"));
@@ -942,6 +1054,7 @@ function focusComp(id){
   flyTo(c,camPos);
 }
 const VIEWS={
+  bay:[[3.25,2.35,0.01],[1.36,0.72,0]],
   front:[[4.3,2.5,3.7],[0,0.6,0]],
   side:[[0.2,1.1,5.8],[0,0.6,0]],
   top:[[0.01,6.6,0.4],[0,0.5,0]],
@@ -952,12 +1065,13 @@ document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",(
 }));
 
 /* ---------- Picking ---------- */
+function shown(o){ while(o){ if(!o.visible) return false; o=o.parent; } return true; }
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), tip=document.getElementById("tip");
 function pick(ev){
   const r=canvas.getBoundingClientRect();
   ndc.set(((ev.clientX-r.left)/r.width)*2-1, -((ev.clientY-r.top)/r.height)*2+1);
   ray.setFromCamera(ndc,camera);
-  const hits=ray.intersectObjects(pickables,false);
+  const hits=ray.intersectObjects(pickables,false).filter(h=>shown(h.object));
   if(!hits.length) return null;
   if(selected){ const h=hits.find(x=>x.object.userData.comp===selected); if(h) return selected; }
   return hits[0].object.userData.comp;
@@ -1008,7 +1122,7 @@ function animate(){
     if(k>=1) tween=null;
   }
   controls.update(); renderer.render(scene,camera);
-  updateCallout();
+  updateCallout(); updateBayLabels();
 }
 document.getElementById("prev").addEventListener("click",()=>step(-1));
 document.getElementById("next").addEventListener("click",()=>step(1));
@@ -1033,6 +1147,7 @@ document.getElementById("dLink").addEventListener("click",()=>{
 });
 function fromHash(){
   const id=(location.hash||"").replace(/^#/,"");
+  if(id==="engine-bay"){ if(selected) select(null); if(!bonnetOpen) setBonnet(true,true); return; }
   if(id && BY_ID[id] && id!==selected) select(id,true);
   else if(!id && selected) select(null);
 }
@@ -1046,6 +1161,7 @@ window.addEventListener("keydown",e=>{
   else if(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"){ e.preventDefault(); step(-1); }
   else if(k==="Escape"||k==="Home"){ if(selected) select(null); const v=VIEWS.front; flyTo(V(v[1]),V(v[0])); }
   else if(k==="p"||k==="P"){ togglePresent(); }
+  else if(k==="b"||k==="B"){ if(bonnetOpen && selected==="bonnet") select(null); setBonnet(!bonnetOpen,!bonnetOpen); }
 });
 if(renderer) init(); else buildList();
 fromHash();
