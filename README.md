@@ -6,4 +6,8 @@ Click any part, or pick it from the list, to see what it does, what to check and
 
 Live site: https://and.github.io/car/
 
+- **Step through parts:** ← → arrow keys, a presentation clicker (Page Up/Down) or the Prev/Next buttons.
+- **Present mode:** press **P** for large text and full screen on a projector.
+- **Link to a part:** every part has its own address, e.g. https://and.github.io/car/#radiator
+
 Built with [three.js](https://threejs.org/) r128 loaded from a CDN; a single `index.html` with no build step.
