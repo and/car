@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hatchback Parts Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: full-height 3D stage on the left, service-manual parts index on the right */
+  --bg:#e7ebef;
+  --stage:#dfe5ea;
+  --panel:#f8f9fb;
+  --ink:#15202e;
+  --muted:#5a6676;
+  --line:#d2d9e1;
+  --accent:#f08a00;
+  --accent-soft:#fff1dc;
+  --ok:#2f7d4f;
+  --font-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
+.app{display:grid;grid-template-columns:1fr 380px;height:100%}
+.stage{position:relative;background:var(--stage);overflow:hidden;min-height:0}
+#canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+#canvas.pointing{cursor:pointer}
+.panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.eyebrow{margin:0;font-family:var(--font-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-size:13px}
+h1{margin:0;font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.05;text-wrap:balance}
+.sub{margin:0;color:var(--muted);font-size:13px}
+.progress{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar span{display:block;height:100%;width:0;background:var(--ok);transition:width .3s}
+.detail{padding:16px 20px;border-bottom:1px solid var(--line);background:#fff;display:grid;gap:10px}
+.detail[hidden]{display:none}
+.dtop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sec{font-family:var(--font-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+.detail h2{margin:2px 0 0;font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.05;text-wrap:balance}
+.who{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:#8a4a00;white-space:nowrap}
+.who.garage{background:#e6ebf2;color:#33445a}
+dl{margin:0;display:grid;gap:8px}
+dt{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+dd{margin:2px 0 0}
+.drow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.check{display:flex;gap:8px;align-items:center;font-weight:500;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--ok)}
+button{font:inherit;color:inherit}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--ink)}
+.x{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);padding:2px 6px}
+.search{padding:12px 20px;border-bottom:1px solid var(--line)}
+.search input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+.list{overflow-y:auto;flex:1;padding:4px 0 24px}
+.group h3{margin:0;padding:14px 20px 6px;font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px}
+.group h3 b{color:var(--ink);font-weight:700}
+.item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:7px 20px;cursor:pointer;border-left:3px solid transparent}
+.item:hover{background:#eef2f6}
+.item[aria-current="true"]{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.tick{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);flex:none;display:grid;place-items:center;font-size:10px;color:#fff}
+.item.done .tick{background:var(--ok);border-color:var(--ok)}
+.item .nm{flex:1}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toolbar{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;pointer-events:none}
+.seg{display:flex;background:rgba(248,249,251,.92);border:1px solid var(--line);border-radius:8px;overflow:hidden;pointer-events:auto;box-shadow:0 1px 3px rgba(21,32,46,.08)}
+.seg .lbl{padding:6px 10px;font-size:12px;color:var(--muted);align-self:center}
+.seg button{border:0;background:none;padding:6px 11px;cursor:pointer;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.hint{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--muted);background:rgba(248,249,251,.85);padding:4px 8px;border-radius:6px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-size:12px;padding:4px 8px;border-radius:5px;transform:translate(12px,12px);white-space:nowrap;display:none}
+.err{position:absolute;inset:0;display:none;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:52% 48%}
+  .panel{border-left:0;border-top:1px solid var(--line)}
+  .head{padding:12px 16px}
+  h1{font-size:24px}
+  .sub{display:none}
+  .item,.group h3,.search,.detail{padding-left:16px;padding-right:16px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){.bar span{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage" id="stage">
+    <canvas id="canvas" aria-label="3D model of a manual hatchback; click a part to inspect it"></canvas>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Body shell">
+        <span class="lbl">Body</span>
+        <button id="mode-solid" data-mode="solid" aria-pressed="false">Solid</button>
+        <button id="mode-xray" data-mode="xray" aria-pressed="true">X-ray</button>
+        <button id="mode-hidden" data-mode="hidden" aria-pressed="false">Hidden</button>
+      </div>
+      <div class="seg" role="group" aria-label="Camera view">
+        <span class="lbl">View</span>
+        <button id="view-front" data-view="front">Front ¾</button>
+        <button id="view-side" data-view="side">Driver side</button>
+        <button id="view-top" data-view="top">Top</button>
+        <button id="view-under" data-view="under">Underside</button>
+      </div>
+    </div>
+    <div class="hint">Drag to rotate · scroll or pinch to zoom · right-drag to pan · click any part</div>
+    <div class="tip" id="tip"></div>
+    <div class="err" id="err">The 3D view needs WebGL, which this browser has turned off. The parts list on the right still works.</div>
+  </main>
+
+  <aside class="panel">
+    <div class="head">
+      <p class="eyebrow">Workshop study aid</p>
+      <h1>Hatchback Parts Explorer</h1>
+      <p class="sub">Generic Indian hatchback with a Maruti-style layout: 1.2 L petrol engine mounted sideways, 5-speed manual, front-wheel drive, right-hand drive. Sections follow the workshop's service checklist.</p>
+      <div class="progress"><div class="bar"><span id="bar"></span></div><span id="progText">0 checked</span></div>
+    </div>
+
+    <section class="detail" id="detail" hidden aria-live="polite">
+      <div class="dtop">
+        <div>
+          <div class="sec" id="dSec"></div>
+          <h2 id="dName"></h2>
+        </div>
+        <button class="x" id="dClose" aria-label="Show all parts">×</button>
+      </div>
+      <div class="drow"><span class="who" id="dWho"></span></div>
+      <dl>
+        <div><dt>What it does</dt><dd id="dWhat"></dd></div>
+        <div><dt>What to check</dt><dd id="dCheck"></dd></div>
+        <div><dt>Warning signs</dt><dd id="dSigns"></dd></div>
+      </dl>
+      <div class="drow">
+        <label class="check" for="dDone"><input type="checkbox" id="dDone"> Covered at the workshop</label>
+        <button class="btn" id="dAll">Show all parts</button>
+      </div>
+    </section>
+
+    <div class="search"><label for="q" class="sec" style="display:block;margin-bottom:4px">Find a part</label><input id="q" type="search" placeholder="e.g. clutch, coolant, bearing" autocomplete="off"></div>
+    <nav class="list" id="list" aria-label="Parts by checklist section"></nav>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- Parts data (mapped to the workshop checklist) ---------- */
+const SECTIONS = {
+  A1:"Engine", A2:"Ignition", A3:"Fuel & air", A4:"Clutch & transmission", A5:"Drive shaft",
+  A6:"Brakes", A7:"Wheels", A8:"Suspension", A9:"Steering", A10:"Electrical", A11:"Body",
+  B:"Cabin & diagnostics"
+};
+const PARTS = [
+ {id:"engine",s:"A1",n:"Engine (1.2 L, 4-cylinder petrol)",who:"Garage",
+  what:"Burns petrol to make power. Mounted sideways (transverse) at the front and drives the front wheels through the gearbox.",
+  check:"Listen for knocking or ticking at idle. Look for oil seeping where the head meets the block.",
+  signs:"Check-engine light, rough idle, loss of power, blue or black smoke."},
+ {id:"belt",s:"A1",n:"Accessory drive belt (water pump drive)",who:"DIY check, garage fix",
+  what:"One rubber belt from the crankshaft pulley drives the water pump, alternator and AC compressor.",
+  check:"Wear: cracks, shiny glazing, frayed edges. Tension: about 1 cm of give under firm thumb pressure.",
+  signs:"Squeal at cold start or when the AC switches on; battery light if it slips."},
+ {id:"coolant",s:"A1",n:"Coolant reservoir",who:"DIY",
+  what:"Overflow tank for the coolant that carries engine heat to the radiator.",
+  check:"Level between MIN and MAX with the engine cold. Crusty pink or green deposits mean a leak. Never open it hot.",
+  signs:"Level keeps dropping, sweet smell, temperature gauge climbing."},
+ {id:"oil",s:"A1",n:"Engine oil, filter & drain plug",who:"DIY check",
+  what:"Oil sits in the sump and lubricates the engine. The filter cleans it; the drain plug lets it out at service time.",
+  check:"Dipstick level between the two marks (level ground, engine off 5 minutes). Amber is fresh, black and gritty is due. Drips under the sump or plug.",
+  signs:"Red oil-can light (stop the engine at once), oil spots where you park, burning smell."},
+ {id:"hoses",s:"A1",n:"Coolant hoses",who:"DIY check, garage fix",
+  what:"Rubber hoses link the radiator, engine and cabin heater.",
+  check:"Squeeze them when cold: firm, not soft, swollen or cracked. Clamps dry.",
+  signs:"Coolant puddle, steam from under the bonnet."},
+ {id:"radiator",s:"A1",n:"Radiator & cooling fan",who:"DIY check",
+  what:"Thin fins pass engine heat to the air. The electric fan pulls air through when the car is slow or stopped.",
+  check:"Fins free of leaves and mud, no leaks at the side tanks, fan runs when hot or with AC on.",
+  signs:"Overheats in traffic but fine on the highway (usually the fan)."},
+ {id:"mounts",s:"A1",n:"Engine mounts",who:"Garage",
+  what:"Rubber blocks that hold the engine and gearbox to the body and soak up vibration.",
+  check:"Cracked or oil-soaked rubber; engine rocking a lot when revved in neutral.",
+  signs:"Clunk when pulling away or changing gear, heavy vibration at idle."},
+ {id:"exhaust",s:"A1",n:"Exhaust system",who:"Garage",
+  what:"Manifold, catalytic converter and silencer carry exhaust gas to the rear and cut noise and emissions.",
+  check:"Black soot marks at joints (leaks), loose rubber hangers, rust holes.",
+  signs:"Louder exhaust, rattle underneath, exhaust smell in the cabin."},
+ {id:"pcv",s:"A1",n:"PCV / EGR valve",who:"Garage",
+  what:"PCV vents gases from inside the engine back into the intake. EGR recirculates a little exhaust to cut emissions.",
+  check:"Hoses not cracked, valve not clogged with sludge.",
+  signs:"Rough idle, oil leaks from seals, check-engine codes."},
+ {id:"plugs",s:"A2",n:"Spark plugs & ignition coils",who:"DIY on many cars",
+  what:"Each coil makes high voltage and its plug fires the spark inside one of the four cylinders.",
+  check:"Plug electrode wear and gap, coil connectors clipped, no cracked coil boots.",
+  signs:"Misfire, jerking under load, poor mileage, codes P0300 to P0304."},
+ {id:"airfilter",s:"A3",n:"Air filter box",who:"DIY",
+  what:"Paper filter element that stops dust getting into the engine.",
+  check:"Hold it to the light; tap out dust; replace if dark or clogged. Dusty city roads wear it faster.",
+  signs:"Sluggish pickup, worse mileage."},
+ {id:"fueltank",s:"A3",n:"Fuel tank, cap & fuel lines",who:"Garage",
+  what:"Tank under the rear seat; steel and plastic lines carry petrol forward to the injectors.",
+  check:"Cap seals and clicks shut; no wet patches or petrol smell along the lines.",
+  signs:"Petrol smell, check-engine code for an evaporative leak."},
+ {id:"fuelfilter",s:"A3",n:"Fuel filter",who:"Garage",
+  what:"Traps dirt before it reaches the injectors. On many petrol cars it sits inside the tank; water draining is mainly a diesel job.",
+  check:"Replace at the interval in the service book.",
+  signs:"Hesitation at speed, hard starting."},
+ {id:"clutchpedal",s:"A4",n:"Clutch pedal",who:"DIY check",
+  what:"Disconnects the engine from the gearbox while pressed so you can change gear.",
+  check:"A little free play at the top before resistance. Bite point should not be right at the top.",
+  signs:"High bite point, slipping (revs rise but speed doesn't), hard gear changes."},
+ {id:"clutchfluid",s:"A4",n:"Clutch master cylinder & fluid",who:"DIY check, garage fix",
+  what:"Hydraulic link from the pedal to the clutch at the gearbox. Some cars use a cable instead.",
+  check:"Fluid at MAX, no leaks at the cylinder or the line.",
+  signs:"Spongy or sinking pedal, gears grinding."},
+ {id:"gearbox",s:"A4",n:"Manual gearbox (5-speed transaxle)",who:"Garage",
+  what:"Gears and the differential in one unit, bolted to the side of the engine.",
+  check:"Oil level and leaks at the seals and drain plug; smooth shifts into every gear.",
+  signs:"Whine that changes with speed, grinding into gear, jumping out of gear."},
+ {id:"gearlever",s:"A4",n:"Gear lever & shift cables",who:"Garage",
+  what:"Two cables carry your lever movements to the gearbox.",
+  check:"Clean, positive movement into each gear without excess wobble.",
+  signs:"Vague or stiff shifting, trouble finding gears."},
+ {id:"driveshaft",s:"A5",n:"Drive shafts",who:"Garage",
+  what:"Two shafts carry power from the gearbox to the front wheels, with flexible CV joints at each end.",
+  check:"Drive slowly in a circle at full steering lock and listen.",
+  signs:"Clicking on sharp turns (outer CV joint), vibration when accelerating."},
+ {id:"cvboot",s:"A5",n:"CV joint boots",who:"DIY check, garage fix",
+  what:"Rubber bellows that keep grease in and dirt out of the drive shaft joints.",
+  check:"Turn the steering to full lock and look behind the front wheel for tears or flung grease.",
+  signs:"Grease spatter inside the wheel; clicking follows later."},
+ {id:"brakefluid",s:"A6",n:"Brake master cylinder, booster & fluid",who:"DIY check",
+  what:"The pedal pushes the master cylinder, the booster multiplies your effort, and fluid carries the pressure to every wheel.",
+  check:"Level between MIN and MAX; golden colour, not dark. Usually replaced every 2 years because it absorbs moisture.",
+  signs:"Spongy pedal, brake warning light, level dropping."},
+ {id:"brakepedal",s:"A6",n:"Brake pedal",who:"DIY check",
+  what:"Your input to the hydraulic brake system.",
+  check:"Pedal height and free play; stays firm when held, does not sink.",
+  signs:"Pedal travels far, sinks slowly, or pulses."},
+ {id:"parking",s:"A6",n:"Parking brake lever & cable",who:"DIY check, garage adjust",
+  what:"A mechanical cable to the rear brakes, separate from the hydraulic system.",
+  check:"Holds the car on a slope within about 5 to 7 clicks; cable not frayed.",
+  signs:"Too many clicks, car creeps on a slope, warning light stays on."},
+ {id:"discs",s:"A6",n:"Front disc brakes (discs, pads, calipers)",who:"DIY check",
+  what:"Calipers squeeze pads against the discs. The front brakes do most of the stopping.",
+  check:"Pad thickness above about 3 mm, scoring on the disc, leaks at the caliper piston.",
+  signs:"Squeal (wear indicator), grinding, pulling to one side, steering wobble when braking."},
+ {id:"drums",s:"A6",n:"Rear drum brakes",who:"Garage",
+  what:"Wheel cylinders push brake shoes outward against a drum. The parking brake works these too.",
+  check:"Shoe wear and wheel-cylinder leaks. Taking the drum off is a workshop job.",
+  signs:"Wet patch on the inside of a rear wheel, weak parking brake."},
+ {id:"brakelines",s:"A6",n:"Brake pipes & hoses",who:"DIY check, garage fix",
+  what:"Steel pipes run along the body; flexible rubber hoses connect them to each wheel.",
+  check:"Hoses not cracked or bulging, pipes not rusted, joints dry.",
+  signs:"Fluid level dropping, spongy pedal."},
+ {id:"tyres",s:"A7",n:"Tyres",who:"DIY",
+  what:"Your only contact with the road.",
+  check:"Pressure when cold (sticker on the driver's door frame), tread depth, cracks, bulges. Rotate about every 10,000 km.",
+  signs:"Uneven wear, pulling to one side, vibration at speed."},
+ {id:"wheels",s:"A7",n:"Wheels (rims) & nuts",who:"DIY check",
+  what:"Steel or alloy rims that carry the tyres.",
+  check:"Bends or cracks from potholes; wheel nuts tight.",
+  signs:"Vibration, a tyre that keeps losing air slowly."},
+ {id:"bearings",s:"A7",n:"Wheel bearings & hubs",who:"Garage",
+  what:"Let each wheel spin smoothly on its axle.",
+  check:"With the wheel off the ground, rock it top to bottom for play and spin it to listen.",
+  signs:"Hum or growl that rises with speed and changes when you weave."},
+ {id:"struts",s:"A8",n:"Front struts (MacPherson)",who:"Garage",
+  what:"Shock absorber and coil spring in one unit; the top also acts as the steering pivot.",
+  check:"Oil on the strut body, broken spring coils, worn top mount.",
+  signs:"Bouncy ride, knock over bumps, nose dives hard when braking."},
+ {id:"arms",s:"A8",n:"Lower control arms & knuckles",who:"Garage",
+  what:"Hold the bottom of each front wheel; rubber bushes absorb shocks.",
+  check:"Cracked bushes, play in the ball joints.",
+  signs:"Clunk over potholes, wandering steering, uneven tyre wear."},
+ {id:"rearaxle",s:"A8",n:"Rear torsion beam axle",who:"Garage",
+  what:"A twisting steel beam linking both rear wheels. Simple and common on Indian hatchbacks.",
+  check:"Bushes at the front pivots; bends from hard hits.",
+  signs:"Clunk or wander from the rear."},
+ {id:"springs",s:"A8",n:"Rear coil springs",who:"Garage",
+  what:"Carry the weight of the rear of the car.",
+  check:"Broken or rusted coils; ride height equal on both sides.",
+  signs:"Sagging rear, clunk over bumps."},
+ {id:"shocks",s:"A8",n:"Rear shock absorbers",who:"Garage",
+  what:"Damp the bouncing of the springs.",
+  check:"Oil on the body; bounce test: push a corner down, it should settle after one rebound.",
+  signs:"Floaty ride, bouncing after speed breakers."},
+ {id:"steeringwheel",s:"A9",n:"Steering wheel & column (tilt)",who:"DIY check",
+  what:"The column links the wheel to the rack. The tilt lever adjusts the wheel's height.",
+  check:"Very little free play before the wheels start to turn; tilt lever locks firmly.",
+  signs:"Clunk in the column, loose-feeling wheel."},
+ {id:"rack",s:"A9",n:"Steering rack & tie rods",who:"Garage",
+  what:"Turns the wheel's rotation into side-to-side movement of the front wheels. Most new cars add electric power assist.",
+  check:"Rubber gaiters on the rack not torn; no play at the tie-rod ends.",
+  signs:"Knocking on rough roads, car wanders, front tyres wear on the edges."},
+ {id:"battery",s:"A10",n:"Battery",who:"DIY",
+  what:"12 V battery that starts the engine and runs the electrics when the engine is off.",
+  check:"About 12.6 V at rest and 13.8–14.5 V with the engine running. Terminals clean and tight. Most are sealed, so electrolyte can't be topped up.",
+  signs:"Slow cranking, clicking, dim lights while starting."},
+ {id:"alternator",s:"A10",n:"Alternator",who:"Garage",
+  what:"Belt-driven generator that charges the battery while you drive.",
+  check:"Charging voltage 13.8–14.5 V at idle with the lights on.",
+  signs:"Battery light on while driving, flat battery after a drive, whining noise."},
+ {id:"harness",s:"A10",n:"Wiring harness & fuse box",who:"DIY check",
+  what:"Bundles of wiring to every electrical part, with fuses that protect each circuit.",
+  check:"Connectors clipped, no chewed wires (rats are common), fuses intact.",
+  signs:"Something stops working, intermittent faults, battery drain."},
+ {id:"lights",s:"A10",n:"Headlamps & tail lamps",who:"DIY",
+  what:"Lighting to see and be seen.",
+  check:"Low and high beam, indicators, brake, reverse and number-plate lights. Lenses clean, no water inside.",
+  signs:"An indicator that blinks fast means a bulb is out."},
+ {id:"ac",s:"A10",n:"AC system",who:"DIY filter, garage gas",
+  what:"Belt-driven compressor, a condenser in front of the radiator, and an evaporator with blower behind the dashboard.",
+  check:"Cold air in both fresh-air and recirculation modes, every blower speed, clean condenser fins and cabin filter.",
+  signs:"Weak cooling, musty smell, noise when the AC switches on."},
+ {id:"wipers",s:"A10",n:"Wipers & washer",who:"DIY",
+  what:"Clear the windscreen; the reservoir feeds the washer jets.",
+  check:"Blades wipe without streaks; reservoir full; jets aimed at the glass.",
+  signs:"Streaks, chattering, squeaking."},
+ {id:"horn",s:"A10",n:"Horn",who:"DIY check",
+  what:"Sits behind the front grille.",
+  check:"Sounds from every part of the horn pad.",
+  signs:"Weak or no sound, often a fuse or relay."},
+ {id:"seats",s:"A11",n:"Seats & seat belts",who:"DIY check",
+  what:"Belts lock in a crash or on a sharp tug.",
+  check:"Seats slide and lock; belts retract fully and lock on a sharp pull; buckles click.",
+  signs:"Belt slow to retract, airbag light on."},
+ {id:"chassis",s:"A11",n:"Floor pan & front subframe",who:"Garage",
+  what:"The floor structure, plus the subframe that carries the engine and front suspension.",
+  check:"Bolts tight, rust on the floor and sills, damage from speed breakers.",
+  signs:"Scraping noises, new rattles."},
+ {id:"latches",s:"A11",n:"Latches, hinges & locks",who:"DIY",
+  what:"Bonnet latch, door hinges, door locks and the hatch latch.",
+  check:"Everything opens, closes and locks smoothly. Lubricate the hinges.",
+  signs:"Door sags, bonnet won't latch, central locking fails."},
+ {id:"obd",s:"B",n:"OBD-II port",who:"DIY",
+  what:"Diagnostic socket under the dashboard on the driver's side. Your Vgate scanner plugs in here.",
+  check:"Read and clear fault codes, watch live data such as coolant temperature and battery voltage.",
+  signs:"Use it whenever a warning light comes on."},
+ {id:"cluster",s:"B",n:"Instrument cluster & warning lights",who:"DIY",
+  what:"Speed, revs, fuel, temperature and the warning lights.",
+  check:"Every warning light glows at key-on and goes out once the engine starts.",
+  signs:"Red means stop (oil pressure, temperature, brakes). Amber means get it checked soon (engine, ABS, airbag)."}
+];
+const BY_ID = Object.fromEntries(PARTS.map(p=>[p.id,p]));
+
+/* ---------- Checked state (this browser only) ---------- */
+const KEY="hpe-checked-v1";
+let done = new Set();
+try{ done = new Set(JSON.parse(localStorage.getItem(KEY)||"[]")); }catch(e){}
+function saveDone(){ try{ localStorage.setItem(KEY, JSON.stringify([...done])); }catch(e){} }
+
+/* ---------- Panel ---------- */
+const listEl=document.getElementById("list"), qEl=document.getElementById("q");
+const detail=document.getElementById("detail");
+const itemEls={};
+function buildList(){
+  listEl.innerHTML="";
+  for(const code of Object.keys(SECTIONS)){
+    const parts=PARTS.filter(p=>p.s===code);
+    const g=document.createElement("div"); g.className="group"; g.dataset.sec=code;
+    const h=document.createElement("h3"); h.innerHTML="<b>"+code+"</b> "+SECTIONS[code];
+    g.appendChild(h);
+    for(const p of parts){
+      const b=document.createElement("button"); b.className="item"; b.type="button"; b.dataset.id=p.id;
+      b.innerHTML='<span class="tick" aria-hidden="true">✓</span><span class="nm"></span>';
+      b.querySelector(".nm").textContent=p.n;
+      b.addEventListener("click",()=>select(p.id,true));
+      b.addEventListener("mouseenter",()=>setHover(p.id));
+      b.addEventListener("mouseleave",()=>setHover(null));
+      itemEls[p.id]=b; g.appendChild(b);
+    }
+    listEl.appendChild(g);
+  }
+  refreshTicks();
+}
+function refreshTicks(){
+  for(const id in itemEls){ itemEls[id].classList.toggle("done",done.has(id)); itemEls[id].setAttribute("aria-label",BY_ID[id].n+(done.has(id)?" (covered)":"")); }
+  const n=PARTS.filter(p=>done.has(p.id)).length;
+  document.getElementById("bar").style.width=(100*n/PARTS.length)+"%";
+  document.getElementById("progText").textContent=n+" of "+PARTS.length+" covered";
+}
+qEl.addEventListener("input",()=>{
+  const q=qEl.value.trim().toLowerCase();
+  document.querySelectorAll(".group").forEach(g=>{
+    let any=false;
+    g.querySelectorAll(".item").forEach(b=>{
+      const p=BY_ID[b.dataset.id];
+      const hit=!q||(p.n+" "+p.what+" "+SECTIONS[p.s]).toLowerCase().includes(q);
+      b.hidden=!hit; any=any||hit;
+    });
+    g.hidden=!any;
+  });
+});
+function showDetail(id){
+  if(!id){ detail.hidden=true; return; }
+  const p=BY_ID[id];
+  document.getElementById("dSec").textContent=p.s+" · "+SECTIONS[p.s];
+  document.getElementById("dName").textContent=p.n;
+  const w=document.getElementById("dWho"); w.textContent=p.who; w.classList.toggle("garage",p.who==="Garage");
+  document.getElementById("dWhat").textContent=p.what;
+  document.getElementById("dCheck").textContent=p.check;
+  document.getElementById("dSigns").textContent=p.signs;
+  document.getElementById("dDone").checked=done.has(id);
+  detail.hidden=false;
+}
+document.getElementById("dDone").addEventListener("change",e=>{
+  if(!selected) return;
+  if(e.target.checked) done.add(selected); else done.delete(selected);
+  saveDone(); refreshTicks();
+});
+document.getElementById("dClose").addEventListener("click",()=>select(null));
+document.getElementById("dAll").addEventListener("click",()=>select(null));
+
+/* ---------- 3D ---------- */
+let selected=null, hovered=null, bodyMode="xray";
+const canvas=document.getElementById("canvas"), stage=document.getElementById("stage");
+let renderer;
+try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true}); }
+catch(e){ document.getElementById("err").style.display="grid"; buildList(); window.select=()=>{}; }
+
+const ACCENT=0xf08a00;
+const comps={}; PARTS.forEach(p=>comps[p.id]={meshes:[]});
+const pickables=[], neutral=[];
+let scene,camera,controls,body,bodyEdges,glass;
+
+function select(id, fly){
+  selected=id||null;
+  for(const k in itemEls) itemEls[k].setAttribute("aria-current", k===selected?"true":"false");
+  showDetail(selected);
+  if(selected){
+    itemEls[selected].scrollIntoView({block:"nearest"});
+    if(bodyMode==="solid") setBodyMode("xray");
+    if(renderer) focusComp(selected);
+  }
+  applyVisuals();
+}
+function setHover(id){ if(hovered===id) return; hovered=id; applyVisuals(); }
+
+function init(){
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setClearColor(0xdfe5ea);
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(38,1,0.05,100);
+  camera.position.set(4.3,2.5,3.7);
+  controls=new THREE.OrbitControls(camera,canvas);
+  controls.target.set(0,0.6,0);
+  controls.enableDamping=true; controls.dampingFactor=0.08;
+  controls.minDistance=0.6; controls.maxDistance=12;
+  controls.update();
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x8a96a3,0.85));
+  const sun=new THREE.DirectionalLight(0xffffff,0.75); sun.position.set(4,7,5); scene.add(sun);
+  const fill=new THREE.DirectionalLight(0xffffff,0.3); fill.position.set(-5,2,-4); scene.add(fill);
+  const under=new THREE.DirectionalLight(0xffffff,0.25); under.position.set(0,-5,0); scene.add(under);
+
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(5.5,64),new THREE.MeshBasicMaterial({color:0xcfd7df}));
+  ground.rotation.x=-Math.PI/2; ground.position.y=-0.002; scene.add(ground);
+  const grid=new THREE.GridHelper(11,22,0xb3bdc8,0xc4ccd5); grid.position.y=0; scene.add(grid);
+
+  buildCar();
+  buildList();
+  applyVisuals();
+  resize(); new ResizeObserver(resize).observe(stage);
+  animate();
+}
+
+function mat(color,o){ return new THREE.MeshStandardMaterial(Object.assign({color,roughness:0.55,metalness:0.2},o||{})); }
+function remember(m){
+  const mt=m.material;
+  m.userData.base={opacity:mt.opacity,transparent:mt.transparent,emissive:mt.emissive.getHex(),ei:mt.emissiveIntensity};
+}
+function add(id,m){
+  if(!comps[id]) throw new Error("unknown part "+id);
+  m.userData.comp=id; scene.add(m); comps[id].meshes.push(m); pickables.push(m); remember(m); return m;
+}
+function addNeutral(m){ scene.add(m); neutral.push(m); remember(m); return m; }
+function V(a){ return new THREE.Vector3(a[0],a[1],a[2]); }
+function box(id,s,p,c,o){ const m=new THREE.Mesh(new THREE.BoxGeometry(s[0],s[1],s[2]),mat(c,o)); m.position.set(p[0],p[1],p[2]); return id?add(id,m):addNeutral(m); }
+function cyl(id,r,h,p,axis,c,o,rTop){
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(rTop==null?r:rTop,r,h,32),mat(c,o));
+  if(axis==="x") m.rotation.z=-Math.PI/2; if(axis==="z") m.rotation.x=Math.PI/2;
+  m.position.set(p[0],p[1],p[2]); return id?add(id,m):addNeutral(m);
+}
+function rod(id,a,b,r,c,o){
+  const A=V(a),B=V(b),len=A.distanceTo(B);
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,16),mat(c,o));
+  m.position.copy(A).add(B).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),B.clone().sub(A).normalize());
+  return id?add(id,m):addNeutral(m);
+}
+function tube(id,pts,r,c,o,closed){
+  const curve=new THREE.CatmullRomCurve3(pts.map(V),!!closed);
+  const g=new THREE.TubeGeometry(curve,Math.min(400,Math.max(32,pts.length*20)),r,10,!!closed);
+  const m=new THREE.Mesh(g,mat(c,o)); return id?add(id,m):addNeutral(m);
+}
+function helix(id,p,h,R,turns,r,c){
+  const pts=[],n=turns*20;
+  for(let i=0;i<=n;i++){ const t=i/n,a=t*turns*Math.PI*2; pts.push([p[0]+R*Math.cos(a),p[1]+t*h,p[2]+R*Math.sin(a)]); }
+  return tube(id,pts,r,c);
+}
+function sphere(id,r,p,c,o){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),mat(c,o)); m.position.set(p[0],p[1],p[2]); return id?add(id,m):addNeutral(m); }
+
+/* Colours */
+const K={ steel:0x8b96a2, dark:0x3a424c, rubber:0x1e2227, alu:0xbcc5ce, rust:0x8c6b57, red:0xc23b2e,
+  belt:0x2a2e33, spring:0x3f7fbf, fluidCool:0xf3a6c0, fluidBrake:0xe8c24a, washer:0x5aa9e6, seat:0x55657a };
+
+function buildCar(){
+  /* Body shell: side profile extruded across the width (x = forward, y = up, z = right/driver side) */
+  const sh=new THREE.Shape();
+  const P=[[1.92,0.30],[1.96,0.45],[1.95,0.62],[1.88,0.80],[1.65,0.92],[1.30,0.98],[0.95,1.02],[0.20,1.50],[-0.40,1.53],[-1.30,1.50],[-1.72,1.36],[-1.88,1.10],[-1.93,0.85],[-1.94,0.45],[-1.90,0.30]];
+  sh.moveTo(P[0][0],P[0][1]); for(let i=1;i<P.length;i++) sh.lineTo(P[i][0],P[i][1]);
+  const arch=(c,r)=>{ for(let i=0;i<=16;i++){ const t=Math.PI-(i/16)*Math.PI; sh.lineTo(c+r*Math.cos(t),0.29+r*Math.sin(t)); } };
+  sh.lineTo(-1.66,0.27); arch(-1.25,0.41); sh.lineTo(0.79,0.27); arch(1.20,0.41); sh.lineTo(1.92,0.30);
+  const bg=new THREE.ExtrudeGeometry(sh,{depth:1.66,bevelEnabled:true,bevelThickness:0.06,bevelSize:0.05,bevelSegments:4,curveSegments:16});
+  bg.translate(0,0,-0.83);
+  body=new THREE.Mesh(bg,new THREE.MeshStandardMaterial({color:0x2d5c9e,roughness:0.35,metalness:0.3,transparent:true,opacity:0.1,depthWrite:false,side:THREE.DoubleSide}));
+  body.renderOrder=10; scene.add(body);
+  bodyEdges=new THREE.LineSegments(new THREE.EdgesGeometry(bg,28),new THREE.LineBasicMaterial({color:0x15202e,transparent:true,opacity:0.32}));
+  bodyEdges.renderOrder=11; scene.add(bodyEdges);
+  const gs=new THREE.Shape();
+  const G=[[0.93,1.10],[0.26,1.53],[-1.28,1.53],[-1.76,1.40],[-1.93,1.10],[-1.80,1.06],[0.85,1.06]];
+  gs.moveTo(G[0][0],G[0][1]); for(let i=1;i<G.length;i++) gs.lineTo(G[i][0],G[i][1]);
+  const gg=new THREE.ExtrudeGeometry(gs,{depth:1.80,bevelEnabled:false}); gg.translate(0,0,-0.90);
+  glass=new THREE.Mesh(gg,new THREE.MeshStandardMaterial({color:0x1b2633,roughness:0.15,metalness:0.6}));
+  glass.visible=false; scene.add(glass);
+
+  /* Cabin furniture that is not on the checklist */
+  box(null,[0.32,0.22,1.5],[0.78,0.85,0],0x4a525c);
+  rod(null,[0.86,0.42,0.50],[0.92,0.66,0.50],0.012,K.dark); box(null,[0.02,0.09,0.05],[0.86,0.42,0.50],K.rubber);
+
+  /* A1 Engine (block mounted sideways, belt on the driver side) */
+  box("engine",[0.36,0.40,0.50],[1.43,0.56,0.16],0x6f7a86,{metalness:0.4});
+  box("engine",[0.32,0.12,0.48],[1.43,0.82,0.16],0x4d5661,{metalness:0.3});
+  cyl("engine",0.022,0.40,[1.27,0.90,0.16],"z",K.alu);
+  box("oil",[0.32,0.12,0.44],[1.43,0.30,0.16],0x2f363f);
+  cyl("oil",0.045,0.12,[1.24,0.46,0.30],"x",0x2f6db5);
+  cyl("oil",0.018,0.03,[1.43,0.23,0.28],"y",K.alu);
+  rod("oil",[1.26,0.45,0.36],[1.24,0.92,0.37],0.006,K.alu);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.022,0.007,8,20),mat(0xf2c200)); ring.position.set(1.24,0.94,0.37); add("oil",ring);
+  cyl("oil",0.028,0.025,[1.52,0.895,0.30],"y",0xf2c200);
+  [-0.18,-0.06,0.06,0.18].forEach(dz=>{ cyl("plugs",0.026,0.08,[1.43,0.90,0.16+dz],"y",0x16191d); cyl("plugs",0.012,0.03,[1.43,0.955,0.16+dz],"y",K.red); });
+  cyl("pcv",0.02,0.05,[1.36,0.905,-0.02],"y",0x3d8b5a);
+  tube("pcv",[[1.36,0.93,-0.02],[1.33,0.96,-0.06],[1.29,0.93,-0.09]],0.008,K.rubber);
+  // accessory belt + pulleys
+  cyl("belt",0.075,0.03,[1.45,0.34,0.425],"z",K.steel);
+  cyl("belt",0.05,0.03,[1.52,0.60,0.425],"z",K.steel);
+  cyl("belt",0.045,0.03,[1.30,0.76,0.425],"z",K.steel);
+  cyl("belt",0.055,0.03,[1.58,0.38,0.425],"z",K.steel);
+  tube("belt",[[1.45,0.262,0.43],[1.58,0.32,0.43],[1.64,0.38,0.43],[1.575,0.60,0.43],[1.52,0.655,0.43],[1.31,0.81,0.43],[1.25,0.76,0.43],[1.37,0.34,0.43]],0.012,K.belt,{},true);
+  // cooling
+  box("radiator",[0.05,0.38,0.62],[1.74,0.55,0],0x7c8b99,{metalness:0.5});
+  cyl("radiator",0.15,0.04,[1.69,0.55,0],"x",K.rubber);
+  tube("hoses",[[1.74,0.70,0.22],[1.68,0.80,0.24],[1.60,0.84,0.24]],0.022,K.rubber);
+  tube("hoses",[[1.74,0.40,-0.22],[1.67,0.34,-0.10],[1.62,0.42,0.05]],0.022,K.rubber);
+  tube("hoses",[[1.27,0.78,0.30],[1.15,0.86,0.12],[0.98,0.84,0.08]],0.016,K.rubber);
+  box("coolant",[0.12,0.14,0.10],[1.66,0.80,0.60],K.fluidCool,{transparent:true,opacity:0.8});
+  cyl("coolant",0.03,0.02,[1.66,0.88,0.60],"y",0x222222);
+  tube("coolant",[[1.66,0.74,0.55],[1.72,0.72,0.40],[1.74,0.72,0.30]],0.008,K.rubber);
+  // mounts
+  box("mounts",[0.10,0.06,0.08],[1.45,0.78,0.50],K.rubber);
+  box("mounts",[0.04,0.04,0.16],[1.45,0.80,0.40],K.steel);
+  cyl("mounts",0.045,0.06,[1.30,0.72,-0.38],"y",K.rubber);
+  // exhaust
+  box("exhaust",[0.06,0.12,0.40],[1.22,0.66,0.16],K.rust);
+  tube("exhaust",[[1.20,0.60,0.14],[1.16,0.38,0.08],[1.12,0.20,-0.05],[0.85,0.16,-0.30],[0.30,0.17,-0.35],[-0.30,0.18,-0.35],[-1.00,0.20,-0.35],[-1.45,0.26,-0.30]],0.028,K.rust);
+  cyl("exhaust",0.07,0.32,[0.55,0.17,-0.35],"x",K.alu);
+  cyl("exhaust",0.12,0.46,[-1.62,0.30,-0.12],"z",K.alu);
+  tube("exhaust",[[-1.60,0.26,-0.33],[-1.80,0.26,-0.40],[-1.98,0.25,-0.42]],0.024,K.rust);
+
+  /* A3 Fuel & air */
+  box("airfilter",[0.20,0.12,0.20],[1.60,0.82,-0.22],0x23282e);
+  tube("airfilter",[[1.50,0.84,-0.12],[1.36,0.92,-0.06],[1.27,0.88,0.00]],0.035,0x23282e);
+  box("fueltank",[0.55,0.14,0.70],[-0.60,0.27,0.23],0x2a3038);
+  tube("fueltank",[[-0.33,0.28,0.50],[0.90,0.30,0.55],[1.05,0.45,0.48],[1.22,0.80,0.32],[1.27,0.90,0.30]],0.008,K.alu);
+  tube("fueltank",[[-0.85,0.32,-0.08],[-1.00,0.50,-0.50],[-1.12,0.80,-0.82]],0.03,K.dark);
+  cyl("fueltank",0.05,0.03,[-1.12,0.82,-0.875],"z",K.dark);
+  cyl("fuelfilter",0.035,0.14,[0.30,0.30,0.55],"x",0xe6e1d3);
+
+  /* A4 Clutch & transmission */
+  box("gearbox",[0.36,0.34,0.32],[1.36,0.52,-0.28],K.alu,{metalness:0.5});
+  cyl("gearbox",0.20,0.04,[1.40,0.56,-0.10],"z",K.alu,{metalness:0.5});
+  cyl("gearbox",0.10,0.12,[1.22,0.32,-0.30],"z",K.alu,{metalness:0.5});
+  cyl("gearbox",0.015,0.02,[1.36,0.345,-0.36],"y",0xf2c200);
+  box("clutchfluid",[0.06,0.06,0.06],[1.08,0.86,0.20],K.fluidBrake,{transparent:true,opacity:0.85});
+  cyl("clutchfluid",0.022,0.12,[1.03,0.80,0.22],"x",K.alu);
+  tube("clutchfluid",[[1.08,0.80,0.22],[1.10,0.95,0.05],[1.12,0.86,-0.10],[1.18,0.62,-0.16]],0.007,K.dark);
+  rod("clutchpedal",[0.86,0.42,0.22],[0.92,0.68,0.22],0.012,K.dark);
+  box("clutchpedal",[0.02,0.08,0.07],[0.86,0.42,0.22],K.rubber);
+  rod("gearlever",[0.58,0.48,0.05],[0.52,0.74,0.05],0.012,K.dark);
+  sphere("gearlever",0.035,[0.515,0.77,0.05],0x111111);
+  cyl("gearlever",0.06,0.08,[0.57,0.48,0.05],"y",K.rubber,{},0.02);
+  tube("gearlever",[[0.58,0.42,0.06],[0.90,0.33,0.00],[1.15,0.45,-0.12],[1.25,0.62,-0.20]],0.009,K.rubber);
+  tube("gearlever",[[0.58,0.42,0.03],[0.90,0.33,-0.04],[1.12,0.45,-0.16],[1.22,0.62,-0.24]],0.009,K.rubber);
+
+  /* A5 Drive shafts */
+  rod("driveshaft",[1.22,0.31,-0.36],[1.20,0.29,-0.52],0.022,K.steel);
+  rod("driveshaft",[1.22,0.31,-0.24],[1.20,0.29,0.52],0.022,K.steel);
+  cyl("cvboot",0.05,0.07,[1.215,0.30,-0.40],"z",K.rubber,{},0.03);
+  cyl("cvboot",0.03,0.07,[1.20,0.29,-0.48],"z",K.rubber,{},0.055);
+  cyl("cvboot",0.03,0.07,[1.215,0.30,-0.20],"z",K.rubber,{},0.05);
+  cyl("cvboot",0.03,0.07,[1.20,0.29,0.48],"z",K.rubber,{},0.055);
+
+  /* A6 Brakes */
+  cyl("brakefluid",0.12,0.10,[1.00,0.78,0.42],"x",K.rubber);
+  cyl("brakefluid",0.035,0.14,[1.11,0.80,0.42],"x",K.alu);
+  box("brakefluid",[0.07,0.05,0.10],[1.12,0.87,0.42],K.fluidBrake,{transparent:true,opacity:0.85});
+  rod("brakepedal",[0.86,0.42,0.37],[0.92,0.68,0.37],0.012,K.dark);
+  box("brakepedal",[0.02,0.08,0.09],[0.86,0.42,0.37],K.rubber);
+  rod("parking",[0.22,0.46,0.02],[0.00,0.56,0.02],0.02,K.dark);
+  tube("parking",[[0.20,0.42,0.02],[0.10,0.30,-0.05],[-0.30,0.24,-0.20],[-0.95,0.24,-0.20],[-1.10,0.24,-0.40],[-1.24,0.29,-0.58]],0.006,K.steel);
+  tube("parking",[[-0.95,0.24,-0.20],[-1.10,0.24,0.40],[-1.24,0.29,0.58]],0.006,K.steel);
+  for(const s of [-1,1]){
+    cyl("discs",0.135,0.022,[1.20,0.29,s*0.63],"z",K.steel,{metalness:0.6});
+    box("discs",[0.07,0.10,0.06],[1.11,0.39,s*0.63],K.red);
+    cyl("drums",0.13,0.07,[-1.25,0.29,s*0.61],"z",0x4b535d);
+  }
+  tube("brakelines",[[1.15,0.80,0.42],[1.05,0.75,0.10],[1.02,0.70,-0.30],[1.08,0.55,-0.55],[1.12,0.42,-0.61]],0.007,0xb8893a);
+  tube("brakelines",[[1.15,0.80,0.42],[1.08,0.65,0.50],[1.12,0.42,0.61]],0.007,0xb8893a);
+  tube("brakelines",[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30]],0.007,0xb8893a);
+  tube("brakelines",[[-1.10,0.22,-0.30],[-1.20,0.24,-0.50],[-1.25,0.30,-0.58]],0.007,0xb8893a);
+  tube("brakelines",[[-1.10,0.22,-0.30],[-1.15,0.22,0.30],[-1.25,0.30,0.58]],0.007,0xb8893a);
+
+  /* A7 Wheels */
+  for(const x of [1.20,-1.25]) for(const s of [-1,1]){
+    cyl("tyres",0.29,0.185,[x,0.29,s*0.74],"z",0x1a1d21,{roughness:0.95,metalness:0});
+    cyl("wheels",0.19,0.19,[x,0.29,s*0.74],"z",0xc9d0d6,{metalness:0.7,roughness:0.3});
+    cyl("bearings",0.055,0.07,[x,0.29,s*0.57],"z",K.alu,{metalness:0.6});
+  }
+
+  /* A8 Suspension */
+  for(const s of [-1,1]){
+    rod("struts",[1.20,0.42,s*0.56],[1.18,0.68,s*0.55],0.032,K.dark);
+    rod("struts",[1.18,0.68,s*0.55],[1.17,0.90,s*0.54],0.012,K.alu);
+    cyl("struts",0.07,0.03,[1.17,0.90,s*0.54],"y",K.rubber);
+    helix("struts",[1.18,0.62,s*0.55],0.24,0.07,5,0.011,K.spring);
+    box("arms",[0.06,0.22,0.05],[1.20,0.33,s*0.53],K.steel);
+    rod("arms",[1.20,0.21,s*0.55],[1.22,0.24,s*0.30],0.02,K.steel);
+    rod("arms",[1.20,0.21,s*0.55],[0.98,0.24,s*0.32],0.02,K.steel);
+    rod("rearaxle",[-1.25,0.29,s*0.56],[-0.82,0.32,s*0.55],0.03,K.steel);
+    cyl("rearaxle",0.04,0.06,[-0.82,0.32,s*0.55],"z",K.rubber);
+    helix("springs",[-1.30,0.33,s*0.42],0.22,0.06,5,0.011,K.spring);
+    rod("shocks",[-1.35,0.28,s*0.55],[-1.40,0.52,s*0.55],0.03,K.dark);
+    rod("shocks",[-1.40,0.52,s*0.55],[-1.42,0.68,s*0.55],0.012,K.alu);
+  }
+  cyl("rearaxle",0.045,1.10,[-1.18,0.30,0],"z",K.steel);
+
+  /* A9 Steering */
+  const sw=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.018,12,40),mat(0x1b1f24));
+  sw.position.set(0.45,0.98,0.37); sw.lookAt(0.45-1,0.98+0.45,0.37); add("steeringwheel",sw);
+  rod("steeringwheel",[0.45,0.98,0.37],[0.47,0.97,0.37],0.05,0x1b1f24);
+  tube("steeringwheel",[[0.46,0.97,0.37],[0.64,0.88,0.37],[0.88,0.60,0.35],[0.98,0.40,0.30]],0.018,K.dark);
+  box("steeringwheel",[0.04,0.03,0.06],[0.62,0.86,0.44],K.dark);
+  cyl("rack",0.035,0.90,[1.00,0.34,0],"z",K.steel);
+  cyl("rack",0.045,0.12,[1.00,0.34,0.30],"z",K.rubber);
+  for(const s of [-1,1]) rod("rack",[1.00,0.34,s*0.45],[1.08,0.33,s*0.55],0.014,K.steel);
+
+  /* A10 Electrical */
+  box("battery",[0.20,0.18,0.15],[1.55,0.80,-0.52],0x2b2f36);
+  cyl("battery",0.015,0.03,[1.49,0.90,-0.48],"y",K.red);
+  cyl("battery",0.015,0.03,[1.61,0.90,-0.48],"y",0x111111);
+  cyl("alternator",0.07,0.10,[1.30,0.76,0.36],"z",K.alu,{metalness:0.5});
+  box("harness",[0.10,0.08,0.10],[1.70,0.82,-0.42],0x30363d);
+  tube("harness",[[1.66,0.84,-0.42],[1.40,0.95,-0.30],[1.30,0.95,0.00],[1.25,0.95,0.30],[1.10,0.95,0.50],[0.98,0.90,0.60]],0.012,0x2f3640);
+  tube("harness",[[1.72,0.82,-0.46],[1.80,0.74,-0.52]],0.01,0x2f3640);
+  tube("harness",[[1.25,0.95,0.30],[1.50,0.90,0.50],[1.80,0.74,0.52]],0.01,0x2f3640);
+  tube("harness",[[0.98,0.90,0.60],[0.90,0.45,0.70],[-1.00,0.42,0.72],[-1.75,0.92,0.66]],0.01,0x2f3640);
+  for(const s of [-1,1]){
+    box("lights",[0.10,0.08,0.30],[1.84,0.68,s*0.55],0xf4f1e6,{emissive:0x666655,emissiveIntensity:0.6});
+    box("lights",[0.06,0.20,0.14],[-1.87,0.98,s*0.66],K.red,{emissive:0x550000,emissiveIntensity:0.8});
+  }
+  box("ac",[0.02,0.36,0.60],[1.80,0.55,0],0x9aa7b4,{metalness:0.5});
+  cyl("ac",0.06,0.14,[1.58,0.38,0.33],"z",K.alu,{metalness:0.5});
+  box("ac",[0.22,0.18,0.45],[0.84,0.62,-0.20],0x7d8794);
+  tube("ac",[[1.58,0.44,0.27],[1.62,0.70,0.05],[1.79,0.72,-0.25]],0.011,K.alu);
+  tube("ac",[[1.80,0.74,-0.28],[1.62,0.93,-0.36],[1.15,0.93,-0.32],[0.96,0.70,-0.25]],0.011,K.alu);
+  rod("wipers",[0.93,0.99,0.35],[0.72,1.13,-0.05],0.01,0x111111);
+  rod("wipers",[0.93,0.99,-0.25],[0.70,1.14,-0.60],0.01,0x111111);
+  box("wipers",[0.12,0.16,0.10],[1.66,0.62,-0.62],K.washer,{transparent:true,opacity:0.8});
+  cyl("horn",0.06,0.03,[1.80,0.45,0.45],"x",K.red);
+
+  /* A11 Body */
+  for(const s of [-1,1]){
+    box("seats",[0.48,0.10,0.48],[0.18,0.46,s*0.37],K.seat);
+    const back=box("seats",[0.10,0.60,0.48],[-0.08,0.79,s*0.37],K.seat); back.rotation.z=0.2;
+    box("seats",[0.08,0.14,0.26],[-0.15,1.16,s*0.37],K.seat);
+    tube("seats",[[-0.08,1.28,s*0.80],[0.02,0.95,s*0.55],[0.10,0.54,s*0.18]],0.008,0x8a2f2f);
+  }
+  box("seats",[0.50,0.10,1.30],[-0.72,0.46,0],K.seat);
+  const rb=box("seats",[0.10,0.62,1.30],[-1.00,0.80,0],K.seat); rb.rotation.z=0.2;
+  box("chassis",[2.60,0.02,1.40],[-0.25,0.36,0],0x56606b);
+  for(const s of [-1,1]) rod("chassis",[1.62,0.24,s*0.32],[0.95,0.24,s*0.32],0.03,0x4a535e);
+  rod("chassis",[0.98,0.24,-0.34],[0.98,0.24,0.34],0.03,0x4a535e);
+  box("latches",[0.05,0.05,0.08],[1.86,0.78,0],K.dark);
+  box("latches",[0.04,0.05,0.10],[-1.93,0.72,0],K.dark);
+  for(const s of [-1,1]){
+    cyl("latches",0.02,0.07,[0.93,0.95,s*0.88],"y",K.steel);
+    cyl("latches",0.02,0.07,[0.93,0.62,s*0.88],"y",K.steel);
+    box("latches",[0.04,0.06,0.03],[-0.30,0.90,s*0.885],K.steel);
+  }
+
+  /* B Cabin & diagnostics */
+  box("obd",[0.05,0.035,0.07],[0.70,0.62,0.50],0x111111);
+  box("obd",[0.012,0.02,0.05],[0.672,0.62,0.50],0x5b6470);
+  box("cluster",[0.03,0.12,0.30],[0.615,1.00,0.37],0x0f141b,{emissive:0x12384f,emissiveIntensity:0.6});
+  [[0.30,0xff3b30],[0.37,0xffb000],[0.44,0x34c759]].forEach(([z,c])=>box("cluster",[0.006,0.02,0.02],[0.598,0.975,z],c,{emissive:c,emissiveIntensity:0.9}));
+}
+
+/* ---------- Visual state ---------- */
+function setMat(mt,dim,b){
+  const wantT = dim ? true : b.transparent;
+  if(mt.transparent!==wantT){ mt.transparent=wantT; mt.needsUpdate=true; }
+  mt.opacity = dim ? 0.05 : b.opacity;
+  mt.depthWrite = !dim && !(b.transparent && b.opacity<0.5);
+}
+function applyVisuals(){
+  if(!scene) return;
+  for(const id in comps){
+    const isSel=selected===id, isHov=hovered===id, dim=!!selected&&!isSel;
+    for(const m of comps[id].meshes){
+      const b=m.userData.base, mt=m.material;
+      setMat(mt,dim,b);
+      if(isSel){ mt.emissive.setHex(ACCENT); mt.emissiveIntensity=0.7; }
+      else if(isHov){ mt.emissive.setHex(ACCENT); mt.emissiveIntensity=dim?0.9:0.35; if(dim) mt.opacity=0.35; }
+      else { mt.emissive.setHex(b.emissive); mt.emissiveIntensity=b.ei; }
+    }
+  }
+  for(const m of neutral) setMat(m.material,!!selected,m.userData.base);
+  body.visible = bodyMode!=="hidden";
+  bodyEdges.visible = bodyMode!=="hidden";
+  glass.visible = bodyMode==="solid";
+  const solid = bodyMode==="solid";
+  if(body.material.transparent===solid){ body.material.transparent=!solid; body.material.needsUpdate=true; }
+  body.material.opacity = solid?1:(selected?0.04:0.09);
+  body.material.depthWrite = solid;
+  body.material.side = solid?THREE.FrontSide:THREE.DoubleSide;
+  bodyEdges.material.opacity = solid?0.15:(selected?0.18:0.32);
+}
+function setBodyMode(m){
+  bodyMode=m;
+  document.querySelectorAll("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===m?"true":"false"));
+  applyVisuals();
+}
+document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>setBodyMode(b.dataset.mode)));
+
+/* ---------- Camera ---------- */
+const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let tween=null;
+function flyTo(target,pos){
+  if(!controls) return;
+  if(reduce){ controls.target.copy(target); camera.position.copy(pos); controls.update(); return; }
+  tween={t0:performance.now(),dur:750,fT:controls.target.clone(),tT:target.clone(),fP:camera.position.clone(),tP:pos.clone()};
+}
+function focusComp(id){
+  const bb=new THREE.Box3();
+  comps[id].meshes.forEach(m=>bb.expandByObject(m));
+  const c=bb.getCenter(new THREE.Vector3()), size=bb.getSize(new THREE.Vector3()).length();
+  const dist=Math.min(5.5,Math.max(1.9,size*2.0+1.1));
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  if(c.y<0.33 && dir.y>0.2){ dir.y=-0.45; }        // underbody parts: look from below
+  else if(dir.y<0.25 && c.y>=0.33){ dir.y=0.45; }
+  dir.normalize();
+  flyTo(c,c.clone().add(dir.multiplyScalar(dist)));
+}
+const VIEWS={
+  front:[[4.3,2.5,3.7],[0,0.6,0]],
+  side:[[0.2,1.1,5.8],[0,0.6,0]],
+  top:[[0.01,6.6,0.4],[0,0.5,0]],
+  under:[[2.6,-2.6,2.9],[0,0.3,0]]
+};
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{
+  const v=VIEWS[b.dataset.view]; flyTo(V(v[1]),V(v[0]));
+}));
+
+/* ---------- Picking ---------- */
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), tip=document.getElementById("tip");
+function pick(ev){
+  const r=canvas.getBoundingClientRect();
+  ndc.set(((ev.clientX-r.left)/r.width)*2-1, -((ev.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects(pickables,false);
+  if(!hits.length) return null;
+  if(selected){ const h=hits.find(x=>x.object.userData.comp===selected); if(h) return selected; }
+  return hits[0].object.userData.comp;
+}
+let down=null;
+if(renderer){
+  canvas.addEventListener("pointerdown",e=>{ down={x:e.clientX,y:e.clientY}; });
+  canvas.addEventListener("pointerup",e=>{
+    if(down && Math.hypot(e.clientX-down.x,e.clientY-down.y)<5){ const id=pick(e); if(id) select(id,true); }
+    down=null;
+  });
+  canvas.addEventListener("pointermove",e=>{
+    if(e.buttons){ tip.style.display="none"; return; }
+    const id=pick(e); setHover(id);
+    canvas.classList.toggle("pointing",!!id);
+    if(id){ const r=stage.getBoundingClientRect(); tip.textContent=BY_ID[id].n; tip.style.left=(e.clientX-r.left)+"px"; tip.style.top=(e.clientY-r.top)+"px"; tip.style.display="block"; }
+    else tip.style.display="none";
+  });
+  canvas.addEventListener("pointerleave",()=>{ setHover(null); tip.style.display="none"; });
+}
+
+function resize(){
+  const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+function animate(){
+  requestAnimationFrame(animate);
+  if(tween){
+    const k=Math.min(1,(performance.now()-tween.t0)/tween.dur), e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    controls.target.lerpVectors(tween.fT,tween.tT,e); camera.position.lerpVectors(tween.fP,tween.tP,e);
+    if(k>=1) tween=null;
+  }
+  controls.update(); renderer.render(scene,camera);
+}
+window.addEventListener("keydown",e=>{ if(e.key==="Escape" && selected) select(null); });
+if(renderer) init();
+})();
+</script>
+</body>
+</html>
