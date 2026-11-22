@@ -127,6 +127,28 @@ body.present .bl{font-size:14px;padding:4px 9px}
 .tbar{display:block;width:64px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2f8bff,#e9eef3 55%,#ff4d4d);position:relative}
 .tbar span{position:absolute;top:-3px;width:3px;height:14px;background:#fff;border-radius:2px;left:0;transition:left .5s}
 .lamps{display:flex;flex-wrap:wrap;gap:5px}
+.dashtoggle{position:absolute;top:6px;right:6px;width:24px;height:24px;border:0;border-radius:6px;background:#2c3540;color:#e8eef4;font-size:16px;line-height:1;cursor:pointer}
+.dashtoggle:hover{background:#3a4552}
+.dash{padding-right:38px}
+.dash.compact{padding:6px 38px 6px 10px;min-width:0;gap:0}
+.dash.compact .lamps,.dash.compact .legend,.dash.compact .gl{display:none}
+.dash.compact .gauges{grid-template-columns:auto auto auto auto;gap:12px}
+.dash.compact .gauges div{grid-template-rows:22px}
+.dash.compact .gauges b{font-size:18px;line-height:22px}
+.dash.compact .tbar{width:44px}
+@media (max-width:820px){
+  .dash{top:auto;bottom:66px;left:8px;transform-origin:bottom left}
+  .toolbar{left:8px;right:8px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;pointer-events:auto;padding-bottom:2px}
+  .toolbar .seg{flex:none}
+  .dash{bottom:64px;max-width:calc(100% - 16px)}
+  .dash .gauges{grid-template-columns:repeat(4,auto);gap:10px}
+  .dash .gauges b{font-size:20px}
+  .nav{left:8px;right:8px;transform:none;bottom:8px;justify-content:space-between;gap:2px;padding:3px}
+  .nav button{padding:7px 9px;font-size:13px;white-space:nowrap}
+  .nav .sep,.nav #present{display:none}
+  .nav #pos{min-width:0;font-size:12px;white-space:nowrap}
+  .modes button{padding:5px 8px}
+}
 .legend{display:grid;gap:4px;border-top:1px solid #2c3540;padding-top:8px}
 .legend:empty{display:none}
 .legend .lt{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#93a1b0}
@@ -176,6 +198,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
     </div>
     <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step · S switches to Stages · B opens the bonnet · P presents</div>
     <div class="dash" id="dash" hidden aria-label="Dashboard">
+      <button class="dashtoggle" id="dashToggle" type="button" aria-expanded="true" title="Show less">−</button>
       <div class="gauges">
         <div><span class="gl">RPM</span><span class="gv"><b id="gRpm">0</b></span></div>
         <div><span class="gl">Speed</span><span class="gv"><b id="gSpd">0</b><span class="gu">km/h</span></span></div>
@@ -1434,6 +1457,14 @@ function animate(){
   updateCallout(); updateBayLabels();
 }
 document.getElementById("prev").addEventListener("click",()=>step(-1));
+(function(){
+  const dash=document.getElementById("dash"), bt=document.getElementById("dashToggle");
+  let compact=false;
+  try{ const v=localStorage.getItem("hpe-dash-compact"); compact = v===null ? window.matchMedia("(max-width:820px)").matches : v==="1"; }catch(e){ compact=window.matchMedia("(max-width:820px)").matches; }
+  function apply(){ dash.classList.toggle("compact",compact); bt.textContent=compact?"+":"−"; bt.title=compact?"Show warning lights and colour key":"Show less"; bt.setAttribute("aria-expanded",compact?"false":"true"); }
+  bt.addEventListener("click",()=>{ compact=!compact; try{ localStorage.setItem("hpe-dash-compact",compact?"1":"0"); }catch(e){} apply(); });
+  apply();
+})();
 document.getElementById("mode-parts").addEventListener("click",()=>{ if(stageMode) setStageMode(false); });
 document.getElementById("mode-stages").addEventListener("click",()=>{ if(!stageMode) setStageMode(true); });
 document.getElementById("sExit").addEventListener("click",()=>setStageMode(false));
