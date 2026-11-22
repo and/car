@@ -7,7 +7,7 @@ Click any part, or pick it from the list, to see what it does, what to check and
 Live site: https://and.github.io/car/
 
 - **Step through parts:** ← → arrow keys, a presentation clicker (Page Up/Down) or the Prev/Next buttons.
-- **Engine bay:** press **B** or Bonnet → Open for a labelled under-bonnet view laid out like a typical Indian car (https://and.github.io/car/#engine-bay).
+- **Engine bay:** the bonnet is always open; the Engine bay view (or **L**) shows labels on the under-bonnet parts laid out like a typical Indian car (https://and.github.io/car/#engine-bay).
 - **Stages:** press **S** for an animated walk-through from key-on to switch-off: ignition, cranking, engine firing, warm-up, first gear, braking, steering and switch-off, with a live dashboard (https://and.github.io/car/#stage-1).
 - **Present mode:** press **P** for large text and full screen on a projector.
 - **Link to a part:** every part has its own address, e.g. https://and.github.io/car/#radiator
