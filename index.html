@@ -191,7 +191,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
         <button id="mode-hidden" data-mode="hidden" aria-pressed="false">Hidden</button>
       </div>
       <div class="seg" role="group" aria-label="Bonnet">
-        <button id="bay-labels" aria-pressed="false" title="Show labels on the engine bay parts">Labels</button>
+        <button id="bay-labels" aria-pressed="false" title="Show labels on the parts (L)">Labels</button>
       </div>
       <div class="seg" role="group" aria-label="Camera view">
         <span class="lbl">View</span>
@@ -762,6 +762,7 @@ function init(){
   buildCar();
   setupAnim();
   setBonnet(true,false);
+  addPartLabels();
   scene.traverse(o=>{ if(o.isMesh && o!==ground && o.parent!==glass) o.castShadow=true; });
   buildList();
   applyVisuals();
@@ -1208,15 +1209,36 @@ const BAY=[
  ["Bonnet lock","latches",[1.81,0.79,0.0],"#7cc4f5"],["Headlight","lights",[1.92,0.74,0.55],"#e8473d"]
 ];
 const bayEl=document.getElementById("bayLabels"), bayBtns=[];
-BAY.forEach(([t,id,p,c])=>{ const b=document.createElement("button"); b.className="bl"; b.type="button"; b.textContent=t; b.style.background=c; if(c==="#3d6ee8") b.style.color="#fff";
-  b.addEventListener("click",()=>select(id,true)); bayEl.appendChild(b); bayBtns.push([b,V(p)]); });
+const LABEL_COLORS=["#e8473d","#f6dc3b","#f49ac2","#7cc4f5","#a8e26b","#f5a443","#c69cf2"];
+function addLabel(t,id,p,c){ const b=document.createElement("button"); b.className="bl"; b.type="button"; b.textContent=t; b.style.background=c; if(c==="#3d6ee8") b.style.color="#fff";
+  b.addEventListener("click",()=>select(id,true)); bayEl.appendChild(b); bayBtns.push([b,p.isVector3?p:V(p)]); }
+BAY.forEach(([t,id,p,c])=>addLabel(t,id,p,c));
+function addPartLabels(){
+  const have=new Set(BAY.map(x=>x[1]));
+  PARTS.forEach((pt,i)=>{
+    if(have.has(pt.id) || !comps[pt.id] || !comps[pt.id].meshes.length) return;
+    let best=null, bv=-1;
+    comps[pt.id].meshes.forEach(m=>{ const bb=new THREE.Box3().setFromObject(m), sz=bb.getSize(new THREE.Vector3()), v=sz.x*sz.y+sz.y*sz.z+sz.x*sz.z; if(v>bv){ bv=v; best=bb.getCenter(new THREE.Vector3()); best.y=bb.max.y; } });
+    addLabel(pt.n.replace(/\s*\(.*\)$/,""),pt.id,best,LABEL_COLORS[i%LABEL_COLORS.length]);
+  });
+}
 function updateBayLabels(){
   const show=bonnetOpen && bayLabelsOn && !selected && !stageMode && !tween;
   bayEl.hidden=!show; if(!show) return;
   const w=stage.clientWidth,h=stage.clientHeight;
+  // place nearest labels first and skip any that would overlap one already placed
+  const items=[];
   for(const [b,p] of bayBtns){ const v=p.clone().project(camera);
     if(v.z>1||Math.abs(v.x)>1||Math.abs(v.y)>1){ b.style.display="none"; continue; }
-    b.style.display="block"; b.style.left=((v.x+1)/2*w)+"px"; b.style.top=((1-v.y)/2*h)+"px"; }
+    items.push([b,(v.x+1)/2*w,(1-v.y)/2*h,v.z]); }
+  items.sort((a,b)=>a[3]-b[3]);
+  const placed=[];
+  for(const [b,x,y] of items){
+    if(!b._w){ b.style.display="block"; b._w=b.offsetWidth; b._h=b.offsetHeight; }
+    const r=[x-b._w/2-2,y-b._h-9,x+b._w/2+2,y+1];
+    if(placed.some(q=>r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1])){ b.style.display="none"; continue; }
+    placed.push(r); b.style.display="block"; b.style.left=x+"px"; b.style.top=y+"px";
+  }
 }
 function setBodyMode(m){
   bodyMode=m;
@@ -1495,6 +1517,7 @@ document.getElementById("next").addEventListener("click",()=>step(1));
 function togglePresent(){
   const on=!document.body.classList.contains("present");
   document.body.classList.toggle("present",on);
+  bayBtns.forEach(x=>{ x[0]._w=0; });
   document.getElementById("present").setAttribute("aria-pressed",on?"true":"false");
   try{
     if(on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
