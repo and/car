@@ -131,7 +131,7 @@ body.present .bl{font-size:14px;padding:4px 9px}
 .legend:empty{display:none}
 .legend .lt{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#93a1b0}
 .legend .li{display:flex;align-items:center;gap:8px;font-size:12px}
-.legend .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+.legend .dot{width:18px;height:4px;border-radius:2px;flex:none;box-shadow:0 0 6px currentColor}
 .lamp{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:#252d37;color:#56616e}
 .lamp.on.red{background:#d6332a;color:#fff}
 .lamp.on.amber{background:#f0a400;color:#1a1300}
@@ -183,7 +183,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
         <div><span class="gl">Temp</span><span class="gv"><span class="gu">C</span><span class="tbar"><span id="gT"></span></span><span class="gu">H</span></span></div>
       </div>
       <div class="lamps" id="lamps"></div>
-      <div class="legend" id="legend" aria-label="What the moving dots show"></div>
+      <div class="legend" id="legend" aria-label="What the glowing lines show"></div>
     </div>
     <div class="nav" role="group" aria-label="Step through parts">
       <div class="modes" role="group" aria-label="What to step through">
@@ -651,7 +651,7 @@ function goStage(i,fly){
   const lg=document.getElementById("legend"); lg.innerHTML="";
   const seen=new Set();
   st.flows.forEach(k=>{ const lab=FLOWLABEL[k]; if(!lab||seen.has(lab)) return; seen.add(lab);
-    if(!seen.size || lg.childElementCount===0){ const h=document.createElement("div"); h.className="lt"; h.textContent="Moving dots show"; lg.appendChild(h); }
+    if(!seen.size || lg.childElementCount===0){ const h=document.createElement("div"); h.className="lt"; h.textContent="Glowing lines show"; lg.appendChild(h); }
     const c="#"+FLOWDEF[k][0].toString(16).padStart(6,"0");
     const d=document.createElement("div"); d.className="li"; d.innerHTML='<span class="dot"></span><span></span>';
     d.querySelector(".dot").style.background=c; d.querySelector(".dot").style.color=c; d.lastChild.textContent=lab; lg.appendChild(d); });
@@ -1294,14 +1294,23 @@ const FLOWDEF={
  brakeRL:[0xff3b30,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.20,0.24,-0.50],[-1.25,0.30,-0.60]]],
  brakeRR:[0xff3b30,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.15,0.22,0.30],[-1.25,0.30,0.60]]]
 };
+function cometTex(){
+  const c=document.createElement("canvas"); c.width=128; c.height=8; const g=c.getContext("2d");
+  const gr=g.createLinearGradient(0,0,128,0);
+  gr.addColorStop(0,"rgba(255,255,255,0)"); gr.addColorStop(0.55,"rgba(255,255,255,0.25)"); gr.addColorStop(0.92,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle=gr; g.fillRect(0,0,128,8);
+  const t=new THREE.CanvasTexture(c); t.wrapS=THREE.RepeatWrapping; t.wrapT=THREE.RepeatWrapping; return t;
+}
 function buildFlows(){
-  const g=new THREE.SphereGeometry(0.014,10,8);
+  const base=cometTex();
   for(const k in FLOWDEF){
-    const [c,pts,closed]=FLOWDEF[k], curve=new THREE.CatmullRomCurve3(pts.map(V),!!closed);
-    const n=Math.max(6,Math.round(curve.getLength()/0.07));
-    const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:lin(c),transparent:true,opacity:0.95,depthTest:false}),n);
-    im.renderOrder=50; im.visible=false; im.frustumCulled=false; scene.add(im);
-    flowObjs[k]={im,curve,n,len:curve.getLength()};
+    const [c,pts,closed]=FLOWDEF[k], curve=new THREE.CatmullRomCurve3(pts.map(V),!!closed), len=curve.getLength();
+    const tex=base.clone(); tex.needsUpdate=true; tex.repeat.set(Math.max(1,Math.round(len/0.16)),1);
+    const geo=new THREE.TubeGeometry(curve,Math.max(40,Math.round(len*120)),0.009,8,!!closed);
+    const im=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:lin(c),map:tex,transparent:true,depthTest:false,depthWrite:false}));
+    const halo=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(40,Math.round(len*120)),0.004,6,!!closed),new THREE.MeshBasicMaterial({color:lin(c),transparent:true,opacity:0.25,depthTest:false,depthWrite:false}));
+    im.add(halo); im.renderOrder=50; halo.renderOrder=49; im.visible=false; scene.add(im);
+    flowObjs[k]={im,tex,len};
   }
 }
 function setFlows(list){ activeFlows=list||[]; for(const k in flowObjs) flowObjs[k].im.visible=activeFlows.includes(k); }
@@ -1404,10 +1413,8 @@ function stageTick(dt){
   const speedScale = {belt:0.35+ST.rpm/3000, exhaust:0.25+ST.rpm/4000, air:0.2+ST.rpm/5000, powerL:ST.spd/40, powerR:ST.spd/40};
   for(const k of activeFlows){
     const f=flowObjs[k]; if(!f) continue;
-    const sp=(speedScale[k]!=null?speedScale[k]:0.25)/f.len;
-    f.off=((f.off||0)+dt*sp)%1;
-    for(let i=0;i<f.n;i++){ const u=(i/f.n+f.off)%1; f.curve.getPointAt(u,_p); _m.makeTranslation(_p.x,_p.y,_p.z); f.im.setMatrixAt(i,_m); }
-    f.im.instanceMatrix.needsUpdate=true;
+    const sp=(speedScale[k]!=null?speedScale[k]:0.25)/0.16;
+    f.tex.offset.x=((f.tex.offset.x - dt*sp)%1+1)%1;
   }
 }
 function resize(){
