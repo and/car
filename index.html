@@ -106,6 +106,28 @@ body.present .callout .ck{font-size:14px}
 .bl:hover{outline:2px solid #fff}
 body.present .bl{font-size:14px;padding:4px 9px}
 .toolbar .seg{flex-wrap:wrap}
+.modes{display:flex;background:#e6ebf0;border-radius:7px;padding:2px}
+.modes button{padding:6px 10px;font-size:13px}
+.modes button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.stagecard ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--ink)}
+.stageitem .tick{border-radius:4px;font-size:10px;color:var(--muted);border-color:transparent;background:#e6ebf0;width:20px;height:20px}
+.dash{position:absolute;left:12px;top:64px;background:rgba(15,20,27,.9);color:#e8eef4;border-radius:10px;padding:10px 12px;display:grid;gap:8px;min-width:250px;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+.dash[hidden]{display:none}
+.gauges{display:grid;grid-template-columns:repeat(4,auto);gap:12px;align-items:end}
+.gauges div{display:grid;gap:2px}
+.gl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#93a1b0}
+.gauges b{font-family:var(--font-display);font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.gu{font-size:10px;color:#93a1b0}
+.tbar{display:block;width:56px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2f8bff,#e9eef3 55%,#ff4d4d);position:relative;margin-top:8px}
+.tbar span{position:absolute;top:-3px;width:3px;height:14px;background:#fff;border-radius:2px;left:0;transition:left .5s}
+.lamps{display:flex;flex-wrap:wrap;gap:5px}
+.lamp{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:#252d37;color:#56616e}
+.lamp.on.red{background:#d6332a;color:#fff}
+.lamp.on.amber{background:#f0a400;color:#1a1300}
+body.present .dash{transform:scale(1.25);transform-origin:top left}
 .err{position:absolute;inset:0;display:none;place-items:center;padding:24px;text-align:center;color:var(--muted)}
 @media (max-width:820px){
   .app{grid-template-columns:1fr;grid-template-rows:52% 48%}
@@ -144,8 +166,22 @@ body.present .bl{font-size:14px;padding:4px 9px}
         <button id="view-under" data-view="under">Underside</button>
       </div>
     </div>
-    <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step through parts · B opens the bonnet · P presents</div>
+    <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step · S switches to Stages · B opens the bonnet · P presents</div>
+    <div class="dash" id="dash" hidden aria-label="Dashboard">
+      <div class="gauges">
+        <div><span class="gl">RPM</span><b id="gRpm">0</b></div>
+        <div><span class="gl">Speed</span><b id="gSpd">0</b><span class="gu">km/h</span></div>
+        <div><span class="gl">Battery</span><b id="gV">12.6</b><span class="gu">V</span></div>
+        <div><span class="gl">Temp</span><span class="tbar"><span id="gT"></span></span></div>
+      </div>
+      <div class="lamps" id="lamps"></div>
+    </div>
     <div class="nav" role="group" aria-label="Step through parts">
+      <div class="modes" role="group" aria-label="What to step through">
+        <button id="mode-parts" aria-pressed="true">Parts</button>
+        <button id="mode-stages" aria-pressed="false">Stages</button>
+      </div>
+      <span class="sep" aria-hidden="true"></span>
       <button id="prev" aria-label="Previous part">‹ Prev</button>
       <span id="pos">Overview</span>
       <button id="next" class="primary" aria-label="Next part">Next ›</button>
@@ -167,6 +203,13 @@ body.present .bl{font-size:14px;padding:4px 9px}
       <div class="progress"><div class="bar"><span id="bar"></span></div><span id="progText">0 checked</span></div>
     </div>
 
+    <section class="detail stagecard" id="stageCard" hidden aria-live="polite">
+      <div class="sec" id="sNum"></div>
+      <h2 id="sTitle"></h2>
+      <ul id="sText"></ul>
+      <div><div class="sec" style="margin-bottom:6px">Parts involved</div><div class="chips" id="sParts"></div></div>
+      <div class="drow"><button class="btn" id="sReplay">Replay this stage</button><button class="btn" id="sExit">Back to parts</button></div>
+    </section>
     <section class="detail" id="detail" hidden aria-live="polite">
       <div class="dtop">
         <div>
@@ -216,6 +259,10 @@ const PARTS = [
   what:"Burns petrol to make power. Mounted sideways (transverse) at the front and drives the front wheels through the gearbox.",
   check:"Listen for knocking or ticking at idle. Look for oil seeping where the head meets the block.",
   signs:"Check-engine light, rough idle, loss of power, blue or black smoke."},
+ {id:"pistons",s:"A1",n:"Pistons & crankshaft (inside the engine)",who:"Garage",
+  what:"Four pistons move up and down inside the cylinders. Burning fuel pushes them down, and connecting rods turn the crankshaft.",
+  check:"Not visible without opening the engine. Compression testing and oil consumption show their condition.",
+  signs:"Blue smoke, heavy oil use, knocking, low power."},
  {id:"belt",s:"A1",n:"Water pump & drive belt",who:"DIY check, garage fix",
   what:"The water pump pushes coolant around the engine. One rubber belt from the crankshaft pulley drives it, along with the alternator and AC compressor.",
   check:"Wear: cracks, shiny glazing, frayed edges. Tension: about 1 cm of give under firm thumb pressure.",
@@ -260,6 +307,10 @@ const PARTS = [
   what:"The mass air flow (MAF) sensor sits in the duct after the air filter and measures how much air the engine breathes in.",
   check:"Duct clamps tight and the rubber duct not cracked; connector clipped on the sensor.",
   signs:"Check-engine light, hesitation or rough idle. A dirty filter can foul the sensor."},
+ {id:"fuelpump",s:"A3",n:"Fuel pump (in the tank)",who:"Garage",
+  what:"An electric pump inside the tank that pushes petrol to the injectors at high pressure.",
+  check:"Listen for a 2-second hum at key-on before starting.",
+  signs:"Long cranking before it starts, stalling, no hum at key-on."},
  {id:"fueltank",s:"A3",n:"Fuel tank, cap & fuel lines",who:"Garage",
   what:"Tank under the rear seat; steel and plastic lines carry petrol forward to the injectors.",
   check:"Cap seals and clicks shut; no wet patches or petrol smell along the lines.",
@@ -368,6 +419,10 @@ const PARTS = [
   what:"12 V battery that starts the engine and runs the electrics when the engine is off.",
   check:"About 12.6 V at rest and 13.8–14.5 V with the engine running. Terminals clean and tight. Most are sealed, so electrolyte can't be topped up.",
   signs:"Slow cranking, clicking, dim lights while starting."},
+ {id:"starter",s:"A10",n:"Starter motor",who:"Garage",
+  what:"A strong electric motor that spins the engine to start it. Its small gear meshes with the flywheel only while you hold the key at START.",
+  check:"Cranks briskly; cable terminals tight and clean.",
+  signs:"Single click with no cranking, grinding noise, slow cranking even with a good battery."},
  {id:"alternator",s:"A10",n:"Alternator",who:"Garage",
   what:"Belt-driven generator that charges the battery while you drive.",
   check:"Charging voltage 13.8–14.5 V at idle with the lights on.",
@@ -425,7 +480,7 @@ const PARTS = [
   check:"Every warning light glows at key-on and goes out once the engine starts.",
   signs:"Red means stop (oil pressure, temperature, brakes). Amber means get it checked soon (engine, ABS, airbag)."}
 ];
-const SHEET={"engine": "Whole engine", "belt": "1a", "coolant": "1b", "oil": "1c", "hoses": "1d", "radiator": "1e", "mounts": "1f", "exhaust": "1g", "pcv": "1h", "plugs": "2a", "airfilter": "3a", "fueltank": "3b", "fuelfilter": "3c", "clutchpedal": "4a", "clutchfluid": "4b", "gearbox": "4c", "gearlever": "4d", "driveshaft": "5a", "cvboot": "5b", "brakefluid": "6a, 6e", "brakepedal": "6b", "parking": "6c", "discs": "6d, 6e", "drums": "6e", "brakelines": "6f", "tyres": "7a", "wheels": "7b", "bearings": "7c", "struts": "8a", "arms": "8b", "rearaxle": "8b", "springs": "8c", "shocks": "8d", "suspbolts": "8e", "steeringwheel": "9a", "rack": "9b", "tilt": "9c", "battery": "10a", "alternator": "Extra", "harness": "10b", "lights": "10c", "ac": "10d", "wipers": "10e", "horn": "10f", "seats": "11a", "maf": "Extra", "bonnet": "Extra", "cowl": "Extra", "chassis": "11b", "chassisbolts": "11b", "latches": "11c", "obd": "Extra", "cluster": "Extra"};
+const SHEET={"engine": "Whole engine", "belt": "1a", "coolant": "1b", "oil": "1c", "hoses": "1d", "radiator": "1e", "mounts": "1f", "exhaust": "1g", "pcv": "1h", "plugs": "2a", "airfilter": "3a", "fueltank": "3b", "fuelfilter": "3c", "clutchpedal": "4a", "clutchfluid": "4b", "gearbox": "4c", "gearlever": "4d", "driveshaft": "5a", "cvboot": "5b", "brakefluid": "6a, 6e", "brakepedal": "6b", "parking": "6c", "discs": "6d, 6e", "drums": "6e", "brakelines": "6f", "tyres": "7a", "wheels": "7b", "bearings": "7c", "struts": "8a", "arms": "8b", "rearaxle": "8b", "springs": "8c", "shocks": "8d", "suspbolts": "8e", "steeringwheel": "9a", "rack": "9b", "tilt": "9c", "battery": "10a", "alternator": "Extra", "harness": "10b", "lights": "10c", "ac": "10d", "wipers": "10e", "horn": "10f", "seats": "11a", "maf": "Extra", "pistons": "Extra", "fuelpump": "Extra", "starter": "Extra", "bonnet": "Extra", "cowl": "Extra", "chassis": "11b", "chassisbolts": "11b", "latches": "11c", "obd": "Extra", "cluster": "Extra"};
 const BY_ID = Object.fromEntries(PARTS.map(p=>[p.id,p]));
 
 /* ---------- Checked state (this browser only) ---------- */
@@ -457,6 +512,12 @@ function buildList(){
     }
     listEl.appendChild(g);
   }
+  const sg=document.createElement("div"); sg.className="group"; sg.dataset.sec="stages"; sg.hidden=true;
+  sg.innerHTML="<h3><b>Stages</b> from key-on to switch-off</h3>";
+  STAGES.forEach((st,k)=>{ const b=document.createElement("button"); b.className="item stageitem"; b.type="button";
+    b.innerHTML='<span class="tick" aria-hidden="true"></span><span class="nm"></span>'; b.querySelector(".tick").textContent=k+1; b.querySelector(".nm").textContent=st.t;
+    b.addEventListener("click",()=>goStage(k,true)); sg.appendChild(b); });
+  listEl.appendChild(sg);
   refreshTicks();
 }
 function refreshTicks(){
@@ -509,6 +570,7 @@ const ACCENT=0xf08a00;
 const comps={}; PARTS.forEach(p=>comps[p.id]={meshes:[]});
 const pickables=[], neutral=[];
 let scene,camera,controls,body,bodyEdges,glass,bodyMat,edgeMat,bonnetMat,bonnetPivot,bonnetRod;
+const pistonParts=[]; let crankMesh,starterMesh;
 const HINGE=[0.975,1.045], BONNET_ANGLE=1.1;
 let bonnetOpen=false, bayLabelsOn=true;
 const bayPlanes=[new THREE.Plane(new THREE.Vector3(0,-1,0),0.79), new THREE.Plane(new THREE.Vector3(-1,0,0),0.985)];
@@ -522,12 +584,74 @@ function stripes(a,b,n){
 }
 
 const ORDER=PARTS.map(p=>p.id);
+const LAMPS=[["battery","Battery","red"],["oil","Oil","red"],["check","Engine","amber"],["brake","Brake","red"],["abs","ABS","amber"],["airbag","Airbag","red"]];
+const ALL_ON={battery:1,oil:1,check:1,brake:1,abs:1,airbag:1};
+const STAGES=[
+ {t:"Key to ON (ignition)",focus:["battery","harness","cluster","fuelpump","fueltank"],flows:["elecDash","elecPump","fuel"],
+  cam:[[2.7,2.5,2.9],[0.6,0.6,0.1]],v:{rpm:0,spd:0,volts:12.5,temp:0.1},lamps:ALL_ON,
+  text:["The battery (12.6 V) powers the car's electronics through the wiring harness.","Every warning light glows for a few seconds as a bulb check.","The fuel pump in the tank hums for about 2 seconds to build fuel pressure.","The engine is not turning yet. Wait for the light check before cranking."]},
+ {t:"Crank (starter motor)",focus:["battery","starter","clutchpedal","clutchfluid","pistons"],flows:["elecStarter","clutchHyd","fuel"],
+  cam:[[3.1,1.7,1.9],[1.3,0.5,0]],v:{rpm:250,spd:0,volts:10.2,temp:0.1,clutch:1},lamps:ALL_ON,starter:true,
+  text:["Clutch pressed (many cars won't crank without it).","Key to START sends 100–200 A from the battery to the starter motor, so the voltage dips to about 10 V.","The starter's small gear turns the flywheel, spinning the engine at 200–300 rpm and moving the pistons."]},
+ {t:"Engine fires (idle)",focus:["airfilter","maf","fueltank","plugs","pistons","exhaust","belt"],flows:["air","fuel","exhaust","belt"],
+  cam:[[3.25,2.35,0.01],[1.36,0.72,0]],v:{rpm:1000,spd:0,volts:14.2,temp:0.25},lamps:{brake:1},sparks:true,
+  text:["Air comes in through the air filter and MAF sensor; injectors spray petrol into it.","Spark plugs fire in the order 1-3-4-2. Each burn pushes a piston down and turns the crankshaft.","Exhaust gas leaves through the manifold, catalytic converter and silencer.","The starter lets go. Idle settles near 800–900 rpm; the oil and battery lights go out."]},
+ {t:"Running systems warm up",focus:["belt","alternator","battery","coolant","hoses","radiator","ac"],flows:["belt","coolHot","coolCold","heater","charge","ac","exhaust"],
+  cam:[[3.3,2.1,-1.9],[1.4,0.6,0]],v:{rpm:850,spd:0,volts:14.1,temp:0.7},lamps:{brake:1},fan:true,sparks:true,
+  text:["The belt drives the water pump: hot coolant goes to the radiator (red), cooled coolant returns to the engine (blue).","The alternator charges the battery at about 14 V.","The cooling fan switches on when the coolant is hot or the AC is on.","The AC compressor pumps refrigerant through the condenser to the cabin."]},
+ {t:"First gear, pull away",focus:["clutchpedal","gearlever","gearbox","driveshaft","cvboot","tyres","wheels","bearings"],flows:["powerL","powerR","belt","exhaust","clutchHyd"],
+  cam:[[1.2,1.2,3.3],[0.7,0.4,0.2]],v:{rpm:1600,spd:12,volts:14.1,temp:0.7,clutch:0,gear:1},from:{clutch:1,spd:0},lamps:{},sparks:true,
+  text:["Handbrake off. Press the clutch, select 1st gear, then release the clutch slowly while adding throttle.","Power flows: engine → clutch → gearbox → differential → drive shafts → front wheels.","CV joints let the drive shafts bend while the wheels go over bumps and steer."]},
+ {t:"Braking",focus:["brakepedal","brakefluid","brakelines","discs","drums","tyres"],flows:["brakeFL","brakeFR","brakeRL","brakeRR"],
+  cam:[[2.4,1.5,3.0],[0.1,0.35,0.1]],v:{rpm:800,spd:0,volts:14.1,temp:0.7,brake:1},from:{spd:30,rpm:1500},lamps:{},sparks:true,slow:true,
+  text:["The brake pedal pushes the master cylinder; the booster multiplies your foot's force.","Brake fluid carries the pressure through pipes and hoses to all four wheels.","Front calipers squeeze the pads onto the discs; rear wheel cylinders push the shoes into the drums.","The brake lights come on at the back."]},
+ {t:"Steering",focus:["steeringwheel","rack","arms","struts","tyres","wheels"],flows:["powerL","powerR"],
+  cam:[[3.0,3.1,1.6],[0.9,0.35,0]],v:{rpm:1200,spd:10,volts:14.1,temp:0.7},lamps:{},sparks:true,steer:true,
+  text:["Turning the steering wheel turns the column and a small gear on the steering rack.","The rack slides sideways; the tie rods turn the front wheels around the strut tops.","An electric motor on the column assists you on most new Indian cars."]},
+ {t:"Switch off",focus:["radiator","cluster","battery"],flows:[],
+  cam:[[4.3,2.5,3.7],[0,0.6,0]],v:{rpm:0,spd:0,volts:12.5,temp:0.7},lamps:{},fan:true,
+  text:["Key OFF: spark and fuel stop, and the engine stops within a second.","The radiator fan may keep running for a minute to cool the engine.","The dashboard goes dark. Lights left on will drain the battery."]}
+];
+let stageMode=false, stageIdx=0, stageT0=0;
+const ST={rpm:0,spd:0,volts:12.6,temp:0.1,clutch:0,brake:0,gear:0,steer:0};
+function setStageMode(on){
+  stageMode=on;
+  document.getElementById("mode-parts").setAttribute("aria-pressed",on?"false":"true");
+  document.getElementById("mode-stages").setAttribute("aria-pressed",on?"true":"false");
+  document.getElementById("stageCard").hidden=!on;
+  document.getElementById("dash").hidden=!on;
+  document.querySelectorAll(".group").forEach(g=>g.hidden=on?(g.dataset.sec!=="stages"):(g.dataset.sec==="stages"));
+  document.querySelector(".search").hidden=on;
+  if(on){ if(selected) select(null); if(bodyMode!=="xray") setBodyMode("xray"); goStage(stageIdx,true); }
+  else { Object.assign(ST,{rpm:0,spd:0,volts:12.6,temp:0.1,clutch:0,brake:0,gear:0,steer:0}); resetAnim(); document.getElementById("pos").textContent="Overview";
+    try{ if(/^#stage-/.test(location.hash)) history.replaceState(null,"",location.pathname+location.search); }catch(e){} applyVisuals(); }
+}
+function goStage(i,fly){
+  stageIdx=(i+STAGES.length)%STAGES.length; const st=STAGES[stageIdx];
+  stageT0=null;
+  if(st.from) Object.assign(ST,st.from);
+  document.getElementById("pos").textContent="Stage "+(stageIdx+1)+" / "+STAGES.length;
+  document.getElementById("sNum").textContent="Stage "+(stageIdx+1)+" of "+STAGES.length;
+  document.getElementById("sTitle").textContent=st.t;
+  const ul=document.getElementById("sText"); ul.innerHTML=""; st.text.forEach(t=>{ const li=document.createElement("li"); li.textContent=t; ul.appendChild(li); });
+  const ch=document.getElementById("sParts"); ch.innerHTML="";
+  st.focus.forEach(id=>{ const b=document.createElement("button"); b.className="chip"; b.type="button"; b.textContent=BY_ID[id].n; b.addEventListener("click",()=>{ setStageMode(false); select(id,true); }); ch.appendChild(b); });
+  document.querySelectorAll(".stageitem").forEach((b,k)=>b.setAttribute("aria-current",k===stageIdx?"true":"false"));
+  const lampEl=document.getElementById("lamps"); lampEl.innerHTML="";
+  LAMPS.forEach(([k,n,c])=>{ const d=document.createElement("span"); d.className="lamp "+c+(st.lamps[k]?" on":""); d.textContent=n; lampEl.appendChild(d); });
+  try{ if(location.hash!=="#stage-"+(stageIdx+1)) location.replace("#stage-"+(stageIdx+1)); }catch(e){}
+  if(fly && renderer) flyTo(V(st.cam[1]),V(st.cam[0]));
+  setFlows(st.flows);
+  applyVisuals();
+}
 function step(d){
+  if(stageMode){ goStage(stageIdx+d,true); return; }
   let i=selected?ORDER.indexOf(selected):(d>0?-1:ORDER.length);
   i=(i+d+ORDER.length)%ORDER.length;
   select(ORDER[i],true);
 }
 function select(id, fly){
+  if(id && stageMode) setStageMode(false);
   selected=id||null;
   if(selected){ document.getElementById("cSec").textContent=BY_ID[selected].s+" · "+SECTIONS[BY_ID[selected].s]; document.getElementById("cName").textContent=BY_ID[selected].n; }
   document.getElementById("pos").textContent = selected ? (ORDER.indexOf(selected)+1)+" / "+ORDER.length : "Overview";
@@ -581,6 +705,7 @@ function init(){
 
   buildCar();
   bonnetPivot.visible=false; bonnetRod.visible=false;
+  setupAnim();
   scene.traverse(o=>{ if(o.isMesh && o!==ground && o.parent!==glass) o.castShadow=true; });
   buildList();
   applyVisuals();
@@ -920,6 +1045,20 @@ function buildCar(){
     box("latches",[0.04,0.06,0.03],[-0.30,0.90,s*0.855],K.steel);
   }
 
+  /* Engine internals, starter motor, fuel pump */
+  [-0.18,-0.06,0.06,0.18].forEach((dz,i)=>{
+    const pz=0.16+dz;
+    const pis=cyl("pistons",0.034,0.05,[1.43,0.62,pz],"y",0xc9d0d6,{metalness:0.8,roughness:0.3});
+    const rd=rod("pistons",[1.43,0.43,pz],[1.43,0.60,pz],0.009,0x8b96a2,{metalness:0.6});
+    pistonParts.push({pis,rd,z:pz,phase:(i===0||i===3)?0:Math.PI});
+  });
+  crankMesh=cyl("pistons",0.016,0.50,[1.43,0.40,0.16],"z",0x6b747e,{metalness:0.7});
+  starterMesh=cyl("starter",0.045,0.15,[1.27,0.40,-0.05],"z",0x3b4148,{metalness:0.4});
+  cyl("starter",0.022,0.11,[1.27,0.46,-0.05],"z",0x8b96a2,{metalness:0.6});
+  tube("starter",[[1.36,0.92,-0.51],[1.33,0.75,-0.40],[1.29,0.52,-0.18],[1.27,0.48,-0.10]],0.009,0xc23b2e);
+  cyl("fuelpump",0.055,0.05,[-0.45,0.36,0.45],"y",0x5b6470,{metalness:0.4});
+  box("fuelpump",[0.04,0.03,0.04],[-0.45,0.395,0.47],0x111111);
+
   /* Bonnet (opens about a hinge near the windscreen), prop rod, rubber stops, cowl */
   bonnetMat=new THREE.MeshPhysicalMaterial({color:lin(0x1d4f91),metalness:0.45,roughness:0.32,clearcoat:1,clearcoatRoughness:0.08,side:THREE.DoubleSide,transparent:true,opacity:0.3,depthWrite:false});
   { const q=(t)=>{ const a=[1.76,0.80],c=[1.35,0.92],b=[0.95,0.98],u=1-t;
@@ -957,7 +1096,8 @@ function setMat(mt,dim,b){
 function applyVisuals(){
   if(!scene) return;
   for(const id in comps){
-    const isSel=selected===id, isHov=hovered===id, dim=!!selected&&!isSel;
+    const inStage=stageMode && !selected && STAGES[stageIdx].focus.includes(id);
+    const isSel=selected===id, isHov=hovered===id, dim=selected ? !isSel : (stageMode && !inStage);
     for(const m of comps[id].meshes){
       const b=m.userData.base, mt=m.material;
       setMat(mt,dim,b);
@@ -966,14 +1106,14 @@ function applyVisuals(){
       else { mt.emissive.setHex(b.emissive); mt.emissiveIntensity=b.ei; }
     }
   }
-  for(const m of neutral) setMat(m.material,!!selected,m.userData.base);
+  for(const m of neutral) setMat(m.material,!!selected||stageMode,m.userData.base);
   body.visible = bodyMode!=="hidden";
   bodyEdges.visible = bodyMode!=="hidden";
   glass.visible = bodyMode==="solid";
   exterior.forEach(m=>{ m.visible = bodyMode==="solid"; });
   const solid = bodyMode==="solid";
   if(bodyMat.transparent===solid){ bodyMat.transparent=!solid; bodyMat.needsUpdate=true; }
-  bodyMat.opacity = solid?1:(selected?0.04:0.09);
+  bodyMat.opacity = solid?1:((selected||stageMode)?0.04:0.09);
   bodyMat.depthWrite = solid;
   bodyMat.side = THREE.DoubleSide;
   edgeMat.opacity = solid?0.12:(selected?0.18:0.32);
@@ -1015,7 +1155,7 @@ const bayEl=document.getElementById("bayLabels"), bayBtns=[];
 BAY.forEach(([t,id,p,c])=>{ const b=document.createElement("button"); b.className="bl"; b.type="button"; b.textContent=t; b.style.background=c; if(c==="#3d6ee8") b.style.color="#fff";
   b.addEventListener("click",()=>select(id,true)); bayEl.appendChild(b); bayBtns.push([b,V(p)]); });
 function updateBayLabels(){
-  const show=bonnetOpen && bayLabelsOn && !selected && !tween;
+  const show=bonnetOpen && bayLabelsOn && !selected && !stageMode && !tween;
   bayEl.hidden=!show; if(!show) return;
   const w=stage.clientWidth,h=stage.clientHeight;
   for(const [b,p] of bayBtns){ const v=p.clone().project(camera);
@@ -1110,6 +1250,145 @@ function updateCallout(){
   leadLine.setAttribute("x1",ax); leadLine.setAttribute("y1",ay); leadLine.setAttribute("x2",x); leadLine.setAttribute("y2",y);
   leadDot.setAttribute("cx",x); leadDot.setAttribute("cy",y);
 }
+/* ---------- Stage animation ---------- */
+const anim=[]; let wheelSet=[], flowObjs={}, activeFlows=[], engAng=0, wheelAng=0, fanAng=0, lastT=performance.now();
+const FLOWDEF={
+ elecDash:[0xffd400,[[1.36,0.93,-0.51],[1.27,0.88,-0.62],[1.30,0.93,-0.30],[1.30,0.95,0.0],[1.25,0.95,0.30],[1.10,0.95,0.50],[0.95,1.00,0.50],[0.65,1.00,0.38]]],
+ elecPump:[0xffd400,[[0.98,0.90,0.60],[0.90,0.45,0.70],[0.0,0.42,0.66],[-0.40,0.42,0.50],[-0.45,0.39,0.45]]],
+ fuel:[0xff8a00,[[-0.45,0.36,0.45],[-0.33,0.30,0.50],[0.30,0.30,0.55],[0.90,0.30,0.55],[1.05,0.45,0.48],[1.22,0.80,0.32],[1.27,0.90,0.28],[1.27,0.91,0.0]]],
+ elecStarter:[0xffd400,[[1.36,0.93,-0.51],[1.33,0.75,-0.40],[1.29,0.52,-0.18],[1.27,0.45,-0.08]]],
+ clutchHyd:[0xf6c344,[[1.08,0.86,0.20],[1.08,0.80,0.22],[1.14,0.78,0.05],[1.18,0.70,-0.08],[1.18,0.62,-0.16]]],
+ air:[0x8fdcff,[[1.42,0.85,-0.38],[1.27,0.88,-0.38],[1.18,0.91,-0.31],[1.12,0.92,-0.21],[1.12,0.93,-0.05],[1.20,0.90,0.08],[1.28,0.85,0.10],[1.40,0.80,0.12]]],
+ exhaust:[0xb4bcc4,[[1.58,0.80,0.16],[1.65,0.72,0.16],[1.66,0.50,0.15],[1.67,0.35,0.08],[1.58,0.18,-0.05],[1.20,0.15,-0.25],[0.85,0.16,-0.30],[0.30,0.17,-0.35],[-0.30,0.18,-0.35],[-1.00,0.20,-0.35],[-1.45,0.26,-0.30],[-1.62,0.30,-0.25],[-1.80,0.26,-0.40],[-2.05,0.25,-0.42]]],
+ belt:[0xffffff,[[1.45,0.262,0.43],[1.58,0.32,0.43],[1.64,0.38,0.43],[1.575,0.60,0.43],[1.52,0.655,0.43],[1.31,0.81,0.43],[1.25,0.76,0.43],[1.37,0.34,0.43]],true],
+ coolHot:[0xff4d4d,[[1.56,0.84,0.24],[1.68,0.80,0.24],[1.74,0.70,0.22],[1.75,0.55,0.05],[1.75,0.42,-0.18]]],
+ coolCold:[0x2f8bff,[[1.74,0.40,-0.22],[1.67,0.34,-0.10],[1.62,0.42,0.05],[1.58,0.55,0.30],[1.52,0.60,0.37]]],
+ heater:[0xff7a5c,[[1.27,0.78,0.30],[1.15,0.86,0.12],[0.98,0.84,0.08],[0.84,0.70,-0.05]]],
+ charge:[0x39d353,[[1.30,0.76,0.36],[1.28,0.90,0.22],[1.30,0.94,-0.10],[1.30,0.93,-0.30],[1.36,0.93,-0.51]]],
+ ac:[0x00e5ff,[[1.58,0.44,0.27],[1.64,0.62,0.46],[1.79,0.70,0.26],[1.80,0.55,0.0],[1.80,0.72,0.29],[1.56,0.84,0.42],[1.32,0.86,0.44],[1.12,0.70,0.40],[0.98,0.58,0.36],[0.86,0.62,-0.05]]],
+ powerL:[0xff6a00,[[1.36,0.52,-0.28],[1.22,0.32,-0.30],[1.21,0.30,-0.45],[1.20,0.29,-0.62]]],
+ powerR:[0xff6a00,[[1.36,0.52,-0.28],[1.22,0.32,-0.24],[1.21,0.30,0.15],[1.20,0.29,0.62]]],
+ brakeFL:[0xff3b30,[[1.15,0.80,0.42],[1.05,0.75,0.10],[1.02,0.70,-0.30],[1.08,0.55,-0.55],[1.12,0.42,-0.62]]],
+ brakeFR:[0xff3b30,[[1.15,0.80,0.42],[1.08,0.65,0.50],[1.12,0.42,0.62]]],
+ brakeRL:[0xff3b30,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.20,0.24,-0.50],[-1.25,0.30,-0.60]]],
+ brakeRR:[0xff3b30,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.15,0.22,0.30],[-1.25,0.30,0.60]]]
+};
+function buildFlows(){
+  const g=new THREE.SphereGeometry(0.014,10,8);
+  for(const k in FLOWDEF){
+    const [c,pts,closed]=FLOWDEF[k], curve=new THREE.CatmullRomCurve3(pts.map(V),!!closed);
+    const n=Math.max(6,Math.round(curve.getLength()/0.07));
+    const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:lin(c),transparent:true,opacity:0.95,depthTest:false}),n);
+    im.renderOrder=50; im.visible=false; im.frustumCulled=false; scene.add(im);
+    flowObjs[k]={im,curve,n,len:curve.getLength()};
+  }
+}
+function setFlows(list){ activeFlows=list||[]; for(const k in flowObjs) flowObjs[k].im.visible=activeFlows.includes(k); }
+const _m=new THREE.Matrix4(), _p=new THREE.Vector3();
+function regAnim(mesh,pivot,kind,extra){ anim.push(Object.assign({mesh,pivot:pivot.clone(),kind,bp:mesh.position.clone(),bq:mesh.quaternion.clone()},extra||{})); }
+function setupAnim(){
+  const Z=new THREE.Vector3(0,0,1);
+  comps.belt.meshes.forEach(m=>{ if(m.geometry.type==="CylinderGeometry") regAnim(m,m.position,"engine",{axis:Z,ratio:1}); });
+  comps.radiator.meshes.forEach(m=>{ if(m.geometry.type==="CylinderGeometry" && m.geometry.parameters.radiusTop>0.1) regAnim(m,m.position,"fan",{axis:new THREE.Vector3(1,0,0)}); });
+  regAnim(crankMesh,crankMesh.position,"engine",{axis:Z,ratio:1});
+  regAnim(starterMesh,starterMesh.position,"starter",{axis:Z});
+  const centers=[[1.20,1],[1.20,-1],[-1.25,1],[-1.25,-1]];
+  for(const id of ["tyres","wheels","discs","drums","bearings"]){
+    comps[id].meshes.forEach(m=>{
+      const isCaliper = id==="discs" && m.geometry.type!=="CylinderGeometry";
+      let best=null,bd=9; centers.forEach(c=>{ const d=Math.hypot(m.position.x-c[0],(m.position.z)-c[1]*0.7); if(d<bd){bd=d;best=c;} });
+      regAnim(m,new THREE.Vector3(best[0],0.29,best[1]*0.68),"wheel",{front:best[0]>0,spin:!isCaliper});
+    });
+  }
+  comps.driveshaft.meshes.concat(comps.cvboot.meshes).forEach(m=>regAnim(m,m.position,"shaft",{axis:Z}));
+  const swN=new THREE.Vector3(-1,0.45,0).normalize(), swC=new THREE.Vector3(0.45,0.98,0.37);
+  comps.steeringwheel.meshes.forEach(m=>{ if(m.geometry.type!=="TubeGeometry") regAnim(m,swC,"steerwheel",{axis:swN}); });
+  comps.rack.meshes.forEach(m=>regAnim(m,m.position,"rack"));
+  comps.clutchpedal.meshes.forEach(m=>regAnim(m,new THREE.Vector3(0.92,0.68,0.22),"clutch",{axis:Z}));
+  comps.brakepedal.meshes.forEach(m=>regAnim(m,new THREE.Vector3(0.92,0.68,0.37),"brakeped",{axis:Z}));
+  comps.gearlever.meshes.forEach(m=>{ if(m.geometry.type!=="TubeGeometry") regAnim(m,new THREE.Vector3(0.58,0.48,0.05),"gear",{axis:Z}); });
+  plugTops=comps.plugs.meshes.filter(m=>m.geometry.type==="CylinderGeometry"&&m.geometry.parameters.radiusTop<0.015).sort((a,b)=>a.position.z-b.position.z);
+  buildFlows();
+}
+let plugTops=[];
+const _q=new THREE.Quaternion(), _q2=new THREE.Quaternion(), Y=new THREE.Vector3(0,1,0), ZZ=new THREE.Vector3(0,0,1);
+function place(a,q,off){
+  a.mesh.position.copy(a.bp).sub(a.pivot).applyQuaternion(q).add(a.pivot); if(off) a.mesh.position.add(off);
+  a.mesh.quaternion.copy(q).multiply(a.bq);
+}
+function resetAnim(){ engAng=0; wheelAng=0; fanAng=0; anim.forEach(a=>{ a.mesh.position.copy(a.bp); a.mesh.quaternion.copy(a.bq); });
+  setFlows([]); pistonParts.forEach(pp=>{ pp.pis.position.y=0.62; }); plugTops.forEach(m=>{ m.material.emissive.setHex(0); });
+  if(comps.lights) comps.lights.meshes.forEach(m=>{ m.material.emissiveIntensity=m.userData.base.ei; }); }
+const lerp=(a,b,k)=>a+(b-a)*k;
+function stageTick(dt){
+  if(!stageMode) return;
+  if(stageT0===null) stageT0=performance.now();
+  const st=STAGES[stageIdx], t=(performance.now()-stageT0)/1000, k=Math.min(1,dt*1.8);
+  const v=st.v;
+  // timed targets
+  let tgtClutch = v.clutch||0;
+  if(stageIdx===4) tgtClutch = t<1.2?1:0;          // release clutch after selecting gear
+  let tgtSpd = v.spd, tgtRpm=v.rpm;
+  if(stageIdx===4 && t<1.6){ tgtSpd=0; tgtRpm=900; }
+  if(stageIdx===5){ tgtSpd = Math.max(0,30-t*6); tgtRpm = tgtSpd>3?1500-t*120:800; }
+  ST.clutch=lerp(ST.clutch,tgtClutch,Math.min(1,dt*(stageIdx===4?1.2:4)));
+  ST.brake=lerp(ST.brake,v.brake||0,Math.min(1,dt*4));
+  ST.gear=lerp(ST.gear,(v.gear&&t>0.8)?1:0,Math.min(1,dt*4));
+  ST.rpm=lerp(ST.rpm,tgtRpm,k); ST.spd=stageIdx===5?tgtSpd:lerp(ST.spd,tgtSpd,Math.min(1,dt*0.8)); ST.volts=lerp(ST.volts,v.volts,k); ST.temp=lerp(ST.temp,v.temp,Math.min(1,dt*0.6));
+  ST.steer = st.steer ? Math.sin(t*1.1)*0.42 : lerp(ST.steer,0,k);
+  // dashboard
+  document.getElementById("gRpm").textContent=Math.round(ST.rpm/10)*10;
+  document.getElementById("gSpd").textContent=Math.round(ST.spd);
+  document.getElementById("gV").textContent=ST.volts.toFixed(1);
+  document.getElementById("gT").style.left=(ST.temp*53)+"px";
+  // rotations (visual speeds are scaled down so they can be followed)
+  engAng += (ST.rpm/60)*2*Math.PI*dt*0.09 + (st.starter? 0 : 0);
+  wheelAng += (ST.spd/3.6)/0.29*dt*0.6;
+  fanAng += (st.fan?14:0)*dt;
+  const starterAng = st.starter ? t*30 : 0;
+  for(const a of anim){
+    switch(a.kind){
+      case "engine": place(a,_q.setFromAxisAngle(a.axis,engAng*(a.ratio||1))); break;
+      case "fan": place(a,_q.setFromAxisAngle(a.axis,fanAng)); break;
+      case "starter": place(a,_q.setFromAxisAngle(a.axis,starterAng)); break;
+      case "shaft": place(a,_q.setFromAxisAngle(a.axis,-wheelAng)); break;
+      case "wheel": {
+        _q.setFromAxisAngle(ZZ,a.spin?-wheelAng:0);
+        if(a.front){ _q2.setFromAxisAngle(Y,ST.steer*0.55); _q.premultiply(_q2); }
+        place(a,_q); break; }
+      case "steerwheel": place(a,_q.setFromAxisAngle(a.axis,ST.steer*3)); break;
+      case "rack": a.mesh.position.copy(a.bp); a.mesh.position.z += ST.steer*0.06; break;
+      case "clutch": place(a,_q.setFromAxisAngle(a.axis,ST.clutch*0.35)); break;
+      case "brakeped": place(a,_q.setFromAxisAngle(a.axis,ST.brake*0.35)); break;
+      case "gear": place(a,_q.setFromAxisAngle(a.axis,-ST.gear*0.28)); break;
+    }
+  }
+  // pistons, rods and sparks (firing order 1-3-4-2)
+  const ca = engAng;
+  pistonParts.forEach((pp,i)=>{
+    const ang=ca+pp.phase, y=0.62+0.035*Math.cos(ang);
+    pp.pis.position.y=y;
+    const pin=new THREE.Vector3(1.43+0.035*Math.sin(ang)*0.0,0.40+0.035*Math.cos(ang),pp.z), top=new THREE.Vector3(1.43,y-0.02,pp.z);
+    pp.rd.position.copy(pin).add(top).multiplyScalar(0.5);
+    pp.rd.scale.set(1,top.distanceTo(pin)/0.17,1);
+  });
+  const fireAt=[0,3*Math.PI,Math.PI,2*Math.PI]; // cylinder 1,2,3,4 within a 720° cycle
+  const cyc=((ca%(4*Math.PI))+4*Math.PI)%(4*Math.PI);
+  plugTops.forEach((m,i)=>{ let d=Math.abs(cyc-fireAt[i]); d=Math.min(d,4*Math.PI-d);
+    const on = st.sparks && ST.rpm>300 && d<0.35;
+    m.material.emissive.setHex(on?0xffffff:0); m.material.emissiveIntensity=on?2.5:0; });
+  // brake lights
+  comps.lights.meshes.forEach(m=>{ if(m.position.x<0){ m.material.emissiveIntensity = ST.brake>0.5 ? 3 : m.userData.base.ei; } });
+  // flow dots
+  const speedScale = {belt:0.35+ST.rpm/3000, exhaust:0.25+ST.rpm/4000, air:0.2+ST.rpm/5000, powerL:ST.spd/40, powerR:ST.spd/40};
+  for(const k of activeFlows){
+    const f=flowObjs[k]; if(!f) continue;
+    const sp=(speedScale[k]!=null?speedScale[k]:0.25)/f.len;
+    f.off=((f.off||0)+dt*sp)%1;
+    for(let i=0;i<f.n;i++){ const u=(i/f.n+f.off)%1; f.curve.getPointAt(u,_p); _m.makeTranslation(_p.x,_p.y,_p.z); f.im.setMatrixAt(i,_m); }
+    f.im.instanceMatrix.needsUpdate=true;
+  }
+}
 function resize(){
   const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return;
   renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
@@ -1121,10 +1400,16 @@ function animate(){
     controls.target.lerpVectors(tween.fT,tween.tT,e); camera.position.lerpVectors(tween.fP,tween.tP,e);
     if(k>=1) tween=null;
   }
+  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  stageTick(dt);
   controls.update(); renderer.render(scene,camera);
   updateCallout(); updateBayLabels();
 }
 document.getElementById("prev").addEventListener("click",()=>step(-1));
+document.getElementById("mode-parts").addEventListener("click",()=>{ if(stageMode) setStageMode(false); });
+document.getElementById("mode-stages").addEventListener("click",()=>{ if(!stageMode) setStageMode(true); });
+document.getElementById("sExit").addEventListener("click",()=>setStageMode(false));
+document.getElementById("sReplay").addEventListener("click",()=>goStage(stageIdx,false));
 document.getElementById("next").addEventListener("click",()=>step(1));
 function togglePresent(){
   const on=!document.body.classList.contains("present");
@@ -1147,9 +1432,12 @@ document.getElementById("dLink").addEventListener("click",()=>{
 });
 function fromHash(){
   const id=(location.hash||"").replace(/^#/,"");
+  const sm=/^stage-(\d+)$/.exec(id);
+  if(sm){ const n=+sm[1]-1; if(n>=0 && n<STAGES.length){ if(!stageMode){ stageIdx=n; setStageMode(true); } else if(n!==stageIdx) goStage(n,true); } return; }
   if(id==="engine-bay"){ if(selected) select(null); if(!bonnetOpen) setBonnet(true,true); return; }
   if(id && BY_ID[id] && id!==selected) select(id,true);
   else if(!id && selected) select(null);
+  else if(!id && stageMode) setStageMode(false);
 }
 window.addEventListener("hashchange",fromHash);
 window.addEventListener("keydown",e=>{
@@ -1159,8 +1447,9 @@ window.addEventListener("keydown",e=>{
   const k=e.key;
   if(k==="ArrowRight"||k==="ArrowDown"||k==="PageDown"){ e.preventDefault(); step(1); }
   else if(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"){ e.preventDefault(); step(-1); }
-  else if(k==="Escape"||k==="Home"){ if(selected) select(null); const v=VIEWS.front; flyTo(V(v[1]),V(v[0])); }
+  else if(k==="Escape"||k==="Home"){ if(stageMode){ setStageMode(false); } if(selected) select(null); const v=VIEWS.front; flyTo(V(v[1]),V(v[0])); }
   else if(k==="p"||k==="P"){ togglePresent(); }
+  else if(k==="s"||k==="S"){ setStageMode(!stageMode); }
   else if(k==="b"||k==="B"){ if(bonnetOpen && selected==="bonnet") select(null); setBonnet(!bonnetOpen,!bonnetOpen); }
 });
 if(renderer) init(); else buildList();
