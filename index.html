@@ -115,14 +115,16 @@ body.present .bl{font-size:14px;padding:4px 9px}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
 .chip:hover{border-color:var(--ink)}
 .stageitem .tick{border-radius:4px;font-size:10px;color:var(--muted);border-color:transparent;background:#e6ebf0;width:20px;height:20px}
-.dash{position:absolute;left:12px;top:64px;background:rgba(15,20,27,.9);color:#e8eef4;border-radius:10px;padding:10px 12px;display:grid;gap:8px;min-width:250px;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+.dash{position:absolute;left:12px;top:64px;width:max-content;background:rgba(15,20,27,.9);color:#e8eef4;border-radius:10px;padding:10px 12px;display:grid;gap:8px;min-width:250px;box-shadow:0 3px 10px rgba(0,0,0,.25)}
 .dash[hidden]{display:none}
-.gauges{display:grid;grid-template-columns:repeat(4,auto);gap:12px;align-items:end}
-.gauges div{display:grid;gap:2px}
+.gauges{display:grid;grid-template-columns:64px 76px 76px auto;gap:14px;align-items:start}
+.gauges div{display:grid;grid-template-rows:auto 28px;gap:4px}
+.gv{display:flex;align-items:baseline;gap:4px;white-space:nowrap}
+.gv .tbar{align-self:center}
 .gl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#93a1b0}
-.gauges b{font-family:var(--font-display);font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.gauges b{font-family:var(--font-display);font-size:26px;line-height:28px;font-variant-numeric:tabular-nums}
 .gu{font-size:10px;color:#93a1b0}
-.tbar{display:block;width:56px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2f8bff,#e9eef3 55%,#ff4d4d);position:relative;margin-top:8px}
+.tbar{display:block;width:64px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2f8bff,#e9eef3 55%,#ff4d4d);position:relative}
 .tbar span{position:absolute;top:-3px;width:3px;height:14px;background:#fff;border-radius:2px;left:0;transition:left .5s}
 .lamps{display:flex;flex-wrap:wrap;gap:5px}
 .lamp{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:#252d37;color:#56616e}
@@ -170,10 +172,10 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
     <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step · S switches to Stages · B opens the bonnet · P presents</div>
     <div class="dash" id="dash" hidden aria-label="Dashboard">
       <div class="gauges">
-        <div><span class="gl">RPM</span><b id="gRpm">0</b></div>
-        <div><span class="gl">Speed</span><b id="gSpd">0</b><span class="gu">km/h</span></div>
-        <div><span class="gl">Battery</span><b id="gV">12.6</b><span class="gu">V</span></div>
-        <div><span class="gl">Temp</span><span class="tbar"><span id="gT"></span></span></div>
+        <div><span class="gl">RPM</span><span class="gv"><b id="gRpm">0</b></span></div>
+        <div><span class="gl">Speed</span><span class="gv"><b id="gSpd">0</b><span class="gu">km/h</span></span></div>
+        <div><span class="gl">Battery</span><span class="gv"><b id="gV">12.6</b><span class="gu">V</span></span></div>
+        <div><span class="gl">Temp</span><span class="gv"><span class="gu">C</span><span class="tbar"><span id="gT"></span></span><span class="gu">H</span></span></div>
       </div>
       <div class="lamps" id="lamps"></div>
     </div>
@@ -1341,7 +1343,7 @@ function stageTick(dt){
   document.getElementById("gRpm").textContent=Math.round(ST.rpm/10)*10;
   document.getElementById("gSpd").textContent=Math.round(ST.spd);
   document.getElementById("gV").textContent=ST.volts.toFixed(1);
-  document.getElementById("gT").style.left=(ST.temp*53)+"px";
+  document.getElementById("gT").style.left=(ST.temp*61)+"px";
   // rotations (visual speeds are scaled down so they can be followed)
   engAng += (ST.rpm/60)*2*Math.PI*dt*0.09 + (st.starter? 0 : 0);
   wheelAng += (ST.spd/3.6)/0.29*dt*0.6;
