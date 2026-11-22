@@ -127,6 +127,11 @@ body.present .bl{font-size:14px;padding:4px 9px}
 .tbar{display:block;width:64px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2f8bff,#e9eef3 55%,#ff4d4d);position:relative}
 .tbar span{position:absolute;top:-3px;width:3px;height:14px;background:#fff;border-radius:2px;left:0;transition:left .5s}
 .lamps{display:flex;flex-wrap:wrap;gap:5px}
+.legend{display:grid;gap:4px;border-top:1px solid #2c3540;padding-top:8px}
+.legend:empty{display:none}
+.legend .lt{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#93a1b0}
+.legend .li{display:flex;align-items:center;gap:8px;font-size:12px}
+.legend .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
 .lamp{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:#252d37;color:#56616e}
 .lamp.on.red{background:#d6332a;color:#fff}
 .lamp.on.amber{background:#f0a400;color:#1a1300}
@@ -178,6 +183,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
         <div><span class="gl">Temp</span><span class="gv"><span class="gu">C</span><span class="tbar"><span id="gT"></span></span><span class="gu">H</span></span></div>
       </div>
       <div class="lamps" id="lamps"></div>
+      <div class="legend" id="legend" aria-label="What the moving dots show"></div>
     </div>
     <div class="nav" role="group" aria-label="Step through parts">
       <div class="modes" role="group" aria-label="What to step through">
@@ -642,6 +648,13 @@ function goStage(i,fly){
   document.querySelectorAll(".stageitem").forEach((b,k)=>b.setAttribute("aria-current",k===stageIdx?"true":"false"));
   const lampEl=document.getElementById("lamps"); lampEl.innerHTML="";
   LAMPS.forEach(([k,n,c])=>{ const d=document.createElement("span"); d.className="lamp "+c+(st.lamps[k]?" on":""); d.textContent=n; lampEl.appendChild(d); });
+  const lg=document.getElementById("legend"); lg.innerHTML="";
+  const seen=new Set();
+  st.flows.forEach(k=>{ const lab=FLOWLABEL[k]; if(!lab||seen.has(lab)) return; seen.add(lab);
+    if(!seen.size || lg.childElementCount===0){ const h=document.createElement("div"); h.className="lt"; h.textContent="Moving dots show"; lg.appendChild(h); }
+    const c="#"+FLOWDEF[k][0].toString(16).padStart(6,"0");
+    const d=document.createElement("div"); d.className="li"; d.innerHTML='<span class="dot"></span><span></span>';
+    d.querySelector(".dot").style.background=c; d.querySelector(".dot").style.color=c; d.lastChild.textContent=lab; lg.appendChild(d); });
   try{ if(location.hash!=="#stage-"+(stageIdx+1)) location.replace("#stage-"+(stageIdx+1)); }catch(e){}
   if(fly && renderer) flyTo(V(st.cam[1]),V(st.cam[0]));
   setFlows(st.flows);
@@ -1255,6 +1268,11 @@ function updateCallout(){
 }
 /* ---------- Stage animation ---------- */
 const anim=[]; let wheelSet=[], flowObjs={}, activeFlows=[], engAng=0, wheelAng=0, fanAng=0, lastT=performance.now();
+const FLOWLABEL={elecDash:"Electricity from the battery",elecPump:"Electricity from the battery",elecStarter:"Electricity from the battery (high current)",
+ fuel:"Petrol from the tank",clutchHyd:"Clutch fluid",air:"Air into the engine",exhaust:"Exhaust gas",belt:"Belt movement",
+ coolHot:"Hot coolant to the radiator",coolCold:"Cooled coolant back to the engine",heater:"Hot coolant to the cabin heater",
+ charge:"Charging current from the alternator",ac:"AC refrigerant",powerL:"Engine power to the wheels",powerR:"Engine power to the wheels",
+ brakeFL:"Brake fluid under pressure",brakeFR:"Brake fluid under pressure",brakeRL:"Brake fluid under pressure",brakeRR:"Brake fluid under pressure"};
 const FLOWDEF={
  elecDash:[0xffd400,[[1.36,0.93,-0.51],[1.27,0.88,-0.62],[1.30,0.93,-0.30],[1.30,0.95,0.0],[1.25,0.95,0.30],[1.10,0.95,0.50],[0.95,1.00,0.50],[0.65,1.00,0.38]]],
  elecPump:[0xffd400,[[0.98,0.90,0.60],[0.90,0.45,0.70],[0.0,0.42,0.66],[-0.40,0.42,0.50],[-0.45,0.39,0.45]]],
