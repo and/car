@@ -165,6 +165,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
 .icon.ok{color:var(--ok)}
 .check.small{margin-left:auto;font-size:13px;color:var(--muted);font-weight:500}
 .check.small input{width:16px;height:16px}
+.seg[hidden]{display:none}
 .err{position:absolute;inset:0;display:none;place-items:center;padding:24px;text-align:center;color:var(--muted)}
 @media (max-width:820px){
   .app{grid-template-columns:1fr;grid-template-rows:52% 48%}
@@ -184,7 +185,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
   <main class="stage" id="stage">
     <canvas id="canvas" aria-label="3D model of a manual hatchback; click a part to inspect it"></canvas>
     <div class="toolbar">
-      <div class="seg" role="group" aria-label="Body shell">
+      <div class="seg" role="group" aria-label="Body shell" hidden>
         <span class="lbl">Body</span>
         <button id="mode-xray" data-mode="xray" aria-pressed="true">X-ray</button>
         <button id="mode-hidden" data-mode="hidden" aria-pressed="false">Hidden</button>
