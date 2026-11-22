@@ -276,6 +276,11 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegmentsGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/Line2.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1317,25 +1322,26 @@ const FLOWDEF={
  brakeRL:[0xdc2626,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.20,0.24,-0.50],[-1.25,0.30,-0.60]]],
  brakeRR:[0xdc2626,[[1.15,0.78,0.40],[0.95,0.50,0.20],[0.80,0.30,-0.20],[-0.90,0.23,-0.22],[-1.10,0.22,-0.30],[-1.15,0.22,0.30],[-1.25,0.30,0.60]]]
 };
-function cometTex(){
-  const c=document.createElement("canvas"); c.width=128; c.height=8; const g=c.getContext("2d");
-  const gr=g.createLinearGradient(0,0,128,0);
-  gr.addColorStop(0,"rgba(255,255,255,0)"); gr.addColorStop(0.55,"rgba(255,255,255,0.25)"); gr.addColorStop(0.92,"rgba(255,255,255,1)"); gr.addColorStop(1,"rgba(255,255,255,0)");
-  g.fillStyle=gr; g.fillRect(0,0,128,8);
-  const t=new THREE.CanvasTexture(c); t.wrapS=THREE.RepeatWrapping; t.wrapT=THREE.RepeatWrapping; return t;
+const lineMats=[];
+function flowLine(pos,width,color,opacity,dashed){
+  const g=new THREE.LineGeometry(); g.setPositions(pos);
+  const m=new THREE.LineMaterial({color,linewidth:width,transparent:true,opacity,depthTest:false,depthWrite:false,dashed:!!dashed,dashSize:0.09,gapSize:0.12});
+  if(dashed) m.defines.USE_DASH="";
+  m.resolution.set(stage.clientWidth||1,stage.clientHeight||1); lineMats.push(m);
+  const l=new THREE.Line2(g,m); l.computeLineDistances(); l.frustumCulled=false; return l;
 }
 function buildFlows(){
-  const base=cometTex();
   for(const k in FLOWDEF){
     const [c,pts,closed]=FLOWDEF[k], curve=new THREE.CatmullRomCurve3(pts.map(V),!!closed), len=curve.getLength();
-    const tex=base.clone(); tex.needsUpdate=true; tex.repeat.set(Math.max(1,Math.round(len/0.16)),1);
-    const segs=Math.max(40,Math.round(len*120));
-    const im=new THREE.Mesh(new THREE.TubeGeometry(curve,segs,0.012,8,!!closed),new THREE.MeshBasicMaterial({color:lin(c),map:tex,transparent:true,depthTest:false,depthWrite:false}));
-    const core=new THREE.Mesh(new THREE.TubeGeometry(curve,segs,0.0065,6,!!closed),new THREE.MeshBasicMaterial({color:lin(c),transparent:true,opacity:0.75,depthTest:false,depthWrite:false}));
-    const edge=new THREE.Mesh(new THREE.TubeGeometry(curve,segs,0.0095,6,!!closed),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.35,depthTest:false,depthWrite:false}));
-    edge.renderOrder=48; core.renderOrder=49; im.renderOrder=50;
-    im.add(edge); im.add(core); im.visible=false; scene.add(im);
-    flowObjs[k]={im,tex,len};
+    const n=Math.max(30,Math.round(len*80)), pos=[];
+    curve.getSpacedPoints(n).forEach(q=>pos.push(q.x,q.y,q.z));
+    const col=lin(c);
+    const grp=new THREE.Group();
+    const edge=flowLine(pos,6,new THREE.Color(0x000000),0.18,false); edge.renderOrder=48;
+    const base=flowLine(pos,3,col,0.75,false); base.renderOrder=49;
+    const dash=flowLine(pos,4.5,col,1,true); dash.renderOrder=50;
+    grp.add(edge,base,dash); grp.visible=false; scene.add(grp);
+    flowObjs[k]={im:grp,dashMat:dash.material,len};
   }
 }
 function setFlows(list){ activeFlows=list||[]; for(const k in flowObjs) flowObjs[k].im.visible=activeFlows.includes(k); }
@@ -1438,13 +1444,14 @@ function stageTick(dt){
   const speedScale = {belt:0.35+ST.rpm/3000, exhaust:0.25+ST.rpm/4000, air:0.2+ST.rpm/5000, powerL:ST.spd/40, powerR:ST.spd/40};
   for(const k of activeFlows){
     const f=flowObjs[k]; if(!f) continue;
-    const sp=(speedScale[k]!=null?speedScale[k]:0.25)/0.16;
-    f.tex.offset.x=((f.tex.offset.x - dt*sp)%1+1)%1;
+    const sp=(speedScale[k]!=null?speedScale[k]:0.25);
+    f.dashMat.dashOffset -= dt*sp;
   }
 }
 function resize(){
   const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return;
   renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  lineMats.forEach(m=>m.resolution.set(w,h));
 }
 function animate(){
   requestAnimationFrame(animate);
