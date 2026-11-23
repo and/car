@@ -96,7 +96,10 @@ body.present .nav button{font-size:17px;padding:10px 18px}
 .lead circle{fill:var(--accent);stroke:#fff;stroke-width:2}
 .callout{position:absolute;pointer-events:none;background:var(--ink);color:#fff;padding:7px 12px;border-radius:7px;max-width:280px;font-weight:600;line-height:1.25;display:none;box-shadow:0 3px 10px rgba(21,32,46,.25)}
 .callout .ck{display:block;font-family:var(--font-display);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#ffc36b;font-weight:600;margin-bottom:2px}
+.callout.stepcall{max-width:340px;font-weight:500;font-size:15px;line-height:1.35;padding:9px 13px}
+.callout.stepcall .ck{margin-bottom:4px}
 body.present .callout{font-size:21px;max-width:360px}
+body.present .callout.stepcall{font-size:20px;max-width:440px}
 body.present .callout .ck{font-size:14px}
 .linkrow input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;background:var(--panel)}
 .linkrow[hidden]{display:none}
@@ -760,12 +763,26 @@ function goStep(si,k,fly){
   if(fly && renderer && camChanged) flyTo(V(S.cam[1]),V(S.cam[0]));
   // callout on the first part of this step
   focusCenter=null;
-  if(renderer){ const m=comps[S.focus[0]].meshes; let best=null,bd=1e9; const cp=V(S.cam[0]);
-    m.forEach(x=>{ const c=new THREE.Box3().setFromObject(x).getCenter(new THREE.Vector3()), d=c.distanceTo(cp); if(d<bd){bd=d;best=c;} }); focusCenter=best; }
-  document.getElementById("cSec").textContent="Step "+(si+1)+"."+(k+1);
-  document.getElementById("cName").textContent=BY_ID[S.focus[0]].n;
+  if(renderer) focusCenter=anchorFor(S.focus[0],V(S.cam[0]));
+  document.getElementById("cSec").textContent="Step "+(k+1)+" of "+st.steps.length+" · "+BY_ID[S.focus[0]].n.replace(/\s*\(.*\)$/,"");
+  document.getElementById("cName").textContent=st.steps[k].s;
+  callout.classList.add("stepcall");
   setFlows(S.flows);
   applyVisuals();
+}
+function snapToMesh(m,target){
+  const pos=m.geometry.attributes.position, v=new THREE.Vector3(); let best=null,bd=1e9;
+  m.updateMatrixWorld(); const step=Math.max(1,Math.floor(pos.count/400));
+  for(let i=0;i<pos.count;i+=step){ v.fromBufferAttribute(pos,i).applyMatrix4(m.matrixWorld); const d=v.distanceToSquared(target); if(d<bd){bd=d;best=v.clone();} }
+  return best||target;
+}
+function anchorFor(id,camPos){
+  let best=null,bs=-1;
+  comps[id].meshes.forEach(m=>{ if(!shown(m)) return; const bb=new THREE.Box3().setFromObject(m), z=bb.getSize(new THREE.Vector3()); let sc=z.x*z.y+z.y*z.z+z.x*z.z;
+    if(camPos){ sc/= (1+bb.getCenter(new THREE.Vector3()).distanceTo(camPos)); } if(sc>bs){ bs=sc; best=m; } });
+  if(!best) return null;
+  const c=new THREE.Box3().setFromObject(best).getCenter(new THREE.Vector3());
+  return snapToMesh(best,c);
 }
 function stepStage(d){
   const st=STAGES[stageIdx]; let si=stageIdx, k=stepIdx+d;
@@ -796,6 +813,7 @@ function revealInPanel(item){
 function select(id, fly){
   if(id && stageMode) setStageMode(false);
   selected=id||null;
+  callout.classList.remove("stepcall");
   if(selected){ document.getElementById("cSec").textContent=BY_ID[selected].s+" · "+SECTIONS[BY_ID[selected].s]; document.getElementById("cName").textContent=BY_ID[selected].n; }
   document.getElementById("pos").textContent = selected ? (ORDER.indexOf(selected)+1)+" / "+ORDER.length : "Overview";
   for(const k in itemEls) itemEls[k].setAttribute("aria-current", k===selected?"true":"false");
@@ -1355,7 +1373,7 @@ function focusComp(id){
   const camPos=c.clone().add(dir.multiplyScalar(dist));
   let best=null, bd=1e9;
   comps[id].meshes.forEach(m=>{ const mc=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()); const d=mc.distanceTo(camPos); if(d<bd){ bd=d; best=mc; } });
-  if(best) focusCenter=best;
+  const a=anchorFor(id,camPos); focusCenter=a||best||c;
   flyTo(c,camPos);
 }
 const VIEWS={
