@@ -110,7 +110,15 @@ body.present .bl{font-size:14px;padding:4px 9px}
 .modes{display:flex;background:#e6ebf0;border-radius:7px;padding:2px}
 .modes button{padding:6px 10px;font-size:13px}
 .modes button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)}
-.stagecard ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.stepi button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:7px;cursor:pointer;color:var(--muted);border-left:3px solid transparent}
+.stepi button:hover{background:#eef2f6}
+.stepi .sn{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:#e6ebf0;color:var(--muted)}
+.stepi.done button{color:var(--muted)}
+.stepi.done .sn{background:#dcefe3;color:var(--ok)}
+.stepi.cur button{background:var(--accent-soft);color:var(--ink);font-weight:600;border-left-color:var(--accent)}
+.stepi.cur .sn{background:var(--accent);color:#fff}
+body.present .stepi button{font-size:17px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
 .chip:hover{border-color:var(--ink)}
@@ -202,7 +210,7 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
         <button id="view-under" data-view="under">Underside</button>
       </div>
     </div>
-    <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step · S switches to Stages · L shows or hides labels · P presents</div>
+    <div class="hint">Drag to rotate · scroll to zoom · ← → or clicker to step · Shift+→ next stage · S switches to Stages · L shows or hides labels · P presents</div>
     <div class="dash" id="dash" hidden aria-label="Dashboard">
       <button class="dashtoggle" id="dashToggle" type="button" aria-expanded="true" title="Show less">−</button>
       <div class="gauges">
@@ -244,9 +252,9 @@ body.present .dash{transform:scale(1.25);transform-origin:top left}
     <section class="detail stagecard" id="stageCard" hidden aria-live="polite">
       <div class="sec" id="sNum"></div>
       <h2 id="sTitle"></h2>
-      <ul id="sText"></ul>
-      <div><div class="sec" style="margin-bottom:6px">Parts involved</div><div class="chips" id="sParts"></div></div>
-      <div class="drow"><button class="btn" id="sReplay">Replay this stage</button><button class="btn" id="sExit">Back to parts</button></div>
+      <ol id="sText" class="steps"></ol>
+      <div><div class="sec" style="margin-bottom:6px">Parts in this step</div><div class="chips" id="sParts"></div></div>
+      <div class="drow"><button class="btn" id="sPlay" aria-pressed="false">▶ Play steps</button><button class="btn" id="sReplay">Restart stage</button><button class="btn" id="sExit">Back to parts</button></div>
     </section>
     <section class="detail" id="detail" hidden aria-live="polite">
       <div class="dtop">
@@ -558,7 +566,7 @@ function buildList(){
   sg.innerHTML="<h3><b>Stages</b> from key-on to switch-off</h3>";
   STAGES.forEach((st,k)=>{ const b=document.createElement("button"); b.className="item stageitem"; b.type="button";
     b.innerHTML='<span class="tick" aria-hidden="true"></span><span class="nm"></span>'; b.querySelector(".tick").textContent=k+1; b.querySelector(".nm").textContent=st.t;
-    b.addEventListener("click",()=>goStage(k,true)); sg.appendChild(b); });
+    b.addEventListener("click",()=>{ stopPlay(); goStep(k,0,true); }); sg.appendChild(b); });
   listEl.appendChild(sg);
   refreshTicks();
 }
@@ -627,33 +635,85 @@ function stripes(a,b,n){
 const ORDER=PARTS.map(p=>p.id);
 const LAMPS=[["battery","Battery","red"],["oil","Oil","red"],["check","Engine","amber"],["brake","Brake","red"],["abs","ABS","amber"],["airbag","Airbag","red"]];
 const ALL_ON={battery:1,oil:1,check:1,brake:1,abs:1,airbag:1};
+const FLOW_BRAKES=["brakeFL","brakeFR","brakeRL","brakeRR"];
+/* Each stage starts from `start` and each step changes it; parts in a step's `focus` glow while it is the current step. */
 const STAGES=[
- {t:"Key to ON (ignition)",focus:["battery","harness","cluster","fuelpump","fueltank"],flows:["elecDash","elecPump","fuel"],
-  cam:[[2.7,2.5,2.9],[0.6,0.6,0.1]],v:{rpm:0,spd:0,volts:12.5,temp:0.1},lamps:ALL_ON,
-  text:["The battery (12.6 V) powers the car's electronics through the wiring harness.","Every warning light comes on for 2–3 seconds as a self-test, so you know the bulbs and the car's checks are working.","The fuel pump in the tank hums for about 2 seconds to build fuel pressure.","The engine is not turning yet. Wait the 2–3 seconds for the self-test and the pump to finish before turning the key to START."]},
- {t:"Crank (starter motor)",focus:["battery","starter","clutchpedal","clutchfluid","pistons"],flows:["elecStarter","clutchHyd","fuel"],
-  cam:[[3.1,1.7,1.9],[1.3,0.5,0]],v:{rpm:250,spd:0,volts:10.2,temp:0.1,clutch:1},lamps:ALL_ON,starter:true,
-  text:["Clutch pressed (many cars won't crank without it).","Key to START sends 100–200 A from the battery to the starter motor, so the voltage dips to about 10 V.","The starter's small gear turns the flywheel, spinning the engine at 200–300 rpm and moving the pistons."]},
- {t:"Engine fires (idle)",focus:["airfilter","maf","fueltank","plugs","pistons","exhaust","belt"],flows:["air","fuel","exhaust"],
-  cam:[[3.25,2.35,0.01],[1.36,0.72,0]],v:{rpm:1000,spd:0,volts:14.2,temp:0.25},lamps:{brake:1},sparks:true,
-  text:["Air comes in through the air filter and MAF sensor; injectors spray petrol into it.","Spark plugs fire in the order 1-3-4-2. Each burn pushes a piston down and turns the crankshaft.","Exhaust gas leaves through the manifold, catalytic converter and silencer.","The starter lets go. Idle settles near 800–900 rpm; the oil and battery lights go out."]},
- {t:"Running systems warm up",focus:["belt","alternator","battery","coolant","hoses","radiator","ac"],flows:["coolHot","coolCold","heater","charge","ac","exhaust"],
-  cam:[[3.3,2.1,-1.9],[1.4,0.6,0]],v:{rpm:850,spd:0,volts:14.1,temp:0.7},lamps:{brake:1},fan:true,sparks:true,
-  text:["The belt drives the water pump: hot coolant goes to the radiator (red), cooled coolant returns to the engine (blue).","The alternator charges the battery at about 14 V.","The cooling fan switches on when the coolant is hot or the AC is on.","The AC compressor pumps refrigerant through the condenser to the cabin."]},
- {t:"First gear, pull away",focus:["clutchpedal","gearlever","gearbox","driveshaft","cvboot","tyres","wheels","bearings"],flows:["powerL","powerR","exhaust","clutchHyd"],
-  cam:[[1.2,1.2,3.3],[0.7,0.4,0.2]],v:{rpm:1600,spd:12,volts:14.1,temp:0.7,clutch:0,gear:1},from:{clutch:1,spd:0},lamps:{},sparks:true,
-  text:["Handbrake off. Press the clutch, select 1st gear, then release the clutch slowly while adding throttle.","Power flows: engine → clutch → gearbox → differential → drive shafts → front wheels.","CV joints let the drive shafts bend while the wheels go over bumps and steer."]},
- {t:"Braking",focus:["brakepedal","brakefluid","brakelines","discs","drums","tyres"],flows:["brakeFL","brakeFR","brakeRL","brakeRR"],
-  cam:[[2.4,1.5,3.0],[0.1,0.35,0.1]],v:{rpm:800,spd:0,volts:14.1,temp:0.7,brake:1},from:{spd:30,rpm:1500},lamps:{},sparks:true,slow:true,
-  text:["The brake pedal pushes the master cylinder; the booster multiplies your foot's force.","Brake fluid carries the pressure through pipes and hoses to all four wheels.","Front calipers squeeze the pads onto the discs; rear wheel cylinders push the shoes into the drums.","The brake lights come on at the back."]},
- {t:"Steering",focus:["steeringwheel","rack","arms","struts","tyres","wheels"],flows:["powerL","powerR"],
-  cam:[[3.0,3.1,1.6],[0.9,0.35,0]],v:{rpm:1200,spd:10,volts:14.1,temp:0.7},lamps:{},sparks:true,steer:true,
-  text:["Turning the steering wheel turns the column and a small gear on the steering rack.","The rack slides sideways; the tie rods turn the front wheels around the strut tops.","An electric motor on the column assists you on most new Indian cars."]},
- {t:"Switch off",focus:["radiator","cluster","battery"],flows:[],
-  cam:[[4.3,2.5,3.7],[0,0.6,0]],v:{rpm:0,spd:0,volts:12.5,temp:0.7},lamps:{},fan:true,
-  text:["Key OFF: spark and fuel stop, and the engine stops within a second.","The radiator fan may keep running for a minute to cool the engine.","The dashboard goes dark. Lights left on will drain the battery."]}
+ {t:"Key to ON (ignition)",cam:[[2.7,2.5,2.9],[0.6,0.6,0.1]],
+  start:{v:{rpm:0,spd:0,volts:12.6,temp:0.1},lamps:{},flows:[],f:{}},
+  steps:[
+   {s:"The battery supplies 12.6 V to the car.",focus:["battery"]},
+   {s:"Current flows through the fuses and the wiring harness.",focus:["harness"],flows:["elecDash"]},
+   {s:"Every warning light comes on for 2–3 seconds as a self-test.",focus:["cluster"],lamps:ALL_ON},
+   {s:"The fuel pump in the tank hums for about 2 seconds.",focus:["fuelpump"],flows:["elecDash","elecPump"],cam:[[0.9,1.7,2.9],[-0.3,0.4,0.3]]},
+   {s:"Petrol is pushed forward to the engine and pressure builds. The engine is still not turning.",focus:["fueltank"],flows:["elecDash","elecPump","fuel"]}
+  ]},
+ {t:"Crank (starter motor)",cam:[[3.1,1.7,1.9],[1.3,0.5,0]],
+  start:{v:{rpm:0,spd:0,volts:12.5,temp:0.1},lamps:ALL_ON,flows:[],f:{}},
+  steps:[
+   {s:"Press the clutch pedal fully down.",focus:["clutchpedal","clutchfluid"],flows:["clutchHyd"],v:{clutch:1}},
+   {s:"Turn the key to START: 100–200 A flows from the battery to the starter motor, so the voltage dips to about 10 V.",focus:["starter","battery"],flows:["clutchHyd","elecStarter"],v:{volts:10.2},f:{starter:true}},
+   {s:"The starter's small gear spins the flywheel, turning the engine at 200–300 rpm and moving the pistons.",focus:["pistons"],v:{rpm:250}}
+  ]},
+ {t:"Engine fires (idle)",cam:[[3.25,2.35,0.01],[1.36,0.72,0]],
+  start:{v:{rpm:250,spd:0,volts:10.2,temp:0.1,clutch:1},lamps:ALL_ON,flows:["elecStarter"],f:{starter:true}},
+  steps:[
+   {s:"Air is drawn in through the air filter; the MAF sensor measures how much.",focus:["airfilter","maf"],flows:["elecStarter","air"]},
+   {s:"The injectors spray petrol into the incoming air.",focus:["fueltank"],flows:["elecStarter","air","fuel"]},
+   {s:"The spark plugs fire in the order 1-3-4-2. Each burn pushes a piston down and the engine starts.",focus:["plugs","pistons"],f:{sparks:true,starter:false},flows:["air","fuel"],v:{rpm:1000}},
+   {s:"Exhaust gas leaves through the manifold, catalytic converter and silencer.",focus:["exhaust"],flows:["air","fuel","exhaust"]},
+   {s:"Release the key and the clutch. Oil pressure builds and the alternator starts charging, so most warning lights go out.",focus:["cluster"],lamps:{brake:1},v:{volts:14.2,clutch:0}}
+  ]},
+ {t:"Running systems warm up",cam:[[3.3,2.1,-1.9],[1.4,0.6,0]],
+  start:{v:{rpm:900,spd:0,volts:14.2,temp:0.25},lamps:{brake:1},flows:["exhaust"],f:{sparks:true}},
+  steps:[
+   {s:"The crankshaft pulley drives the belt, turning the water pump, alternator and AC compressor.",focus:["belt"]},
+   {s:"The alternator charges the battery at about 14 V.",focus:["alternator","battery"],flows:["exhaust","charge"],v:{volts:14.1}},
+   {s:"The water pump circulates coolant: hot coolant goes to the radiator and heater, cooled coolant returns.",focus:["hoses","radiator","coolant"],flows:["exhaust","charge","coolHot","coolCold","heater"],v:{temp:0.7,rpm:850}},
+   {s:"The cooling fan switches on when the coolant is hot.",focus:["radiator"],f:{fan:true}},
+   {s:"The AC compressor pumps refrigerant through the condenser to the cabin.",focus:["ac"],flows:["exhaust","charge","coolHot","coolCold","heater","ac"]}
+  ]},
+ {t:"First gear, pull away",cam:[[1.2,1.2,3.3],[0.7,0.4,0.2]],
+  start:{v:{rpm:850,spd:0,volts:14.1,temp:0.7},lamps:{brake:1},flows:["exhaust"],f:{sparks:true}},
+  steps:[
+   {s:"Release the handbrake; the brake warning light goes out.",focus:["parking"],lamps:{}},
+   {s:"Press the clutch: the engine is now disconnected from the gearbox.",focus:["clutchpedal","clutchfluid"],flows:["exhaust","clutchHyd"],v:{clutch:1}},
+   {s:"Select 1st gear.",focus:["gearlever","gearbox"],v:{gear:1}},
+   {s:"Release the clutch slowly while pressing the accelerator.",focus:["clutchpedal"],flows:["exhaust"],v:{clutch:0,rpm:1600}},
+   {s:"Power flows from the gearbox through the drive shafts to the front wheels, and the car moves.",focus:["driveshaft","cvboot","tyres","wheels","bearings"],flows:["exhaust","powerL","powerR"],v:{spd:12}}
+  ]},
+ {t:"Braking",cam:[[2.4,1.5,3.0],[0.1,0.35,0.1]],
+  start:{v:{rpm:1500,spd:30,volts:14.1,temp:0.7,gear:1},lamps:{},flows:["exhaust","powerL","powerR"],f:{sparks:true}},
+  steps:[
+   {s:"Take your foot off the accelerator and press the brake pedal; the booster multiplies your force.",focus:["brakepedal"],v:{brake:1,rpm:1300},flows:["exhaust"]},
+   {s:"The master cylinder pushes on the brake fluid.",focus:["brakefluid"]},
+   {s:"Fluid pressure travels through pipes and hoses to all four wheels.",focus:["brakelines"],flows:["exhaust"].concat(FLOW_BRAKES)},
+   {s:"Front pads clamp the discs and rear shoes press on the drums. The car slows to a stop.",focus:["discs","drums","tyres"],v:{spd:0,rpm:800,rate:0.35}},
+   {s:"The brake lights come on at the back so drivers behind can see.",focus:["lights"],cam:[[-4.0,1.6,2.4],[-1.5,0.7,0]]}
+  ]},
+ {t:"Steering",cam:[[3.0,3.1,1.6],[0.9,0.35,0]],
+  start:{v:{rpm:1200,spd:10,volts:14.1,temp:0.7,gear:1},lamps:{},flows:["exhaust","powerL","powerR"],f:{sparks:true}},
+  steps:[
+   {s:"Turn the steering wheel.",focus:["steeringwheel"],f:{steer:true}},
+   {s:"The column turns a small gear on the steering rack, and the rack slides sideways. An electric motor assists on most new cars.",focus:["rack"]},
+   {s:"The tie rods push the front wheels, which pivot on the struts.",focus:["arms","struts","tyres","wheels"]}
+  ]},
+ {t:"Switch off",cam:[[4.3,2.5,3.7],[0,0.6,0]],
+  start:{v:{rpm:850,spd:0,volts:14.1,temp:0.7},lamps:{},flows:["exhaust","charge"],f:{sparks:true}},
+  steps:[
+   {s:"Turn the key to OFF: the spark and fuel stop.",focus:["plugs"],f:{sparks:false},flows:[],v:{rpm:0}},
+   {s:"The engine stops within a second and the alternator stops charging.",focus:["alternator","battery"],v:{volts:12.5}},
+   {s:"The radiator fan may keep running for a minute to cool the engine.",focus:["radiator"],f:{fan:true}},
+   {s:"The dashboard goes dark. Lights left on will drain the battery.",focus:["cluster"]}
+  ]}
 ];
-let stageMode=false, stageIdx=0, stageT0=0;
+function stageState(si,k){
+  const st=STAGES[si], S={v:Object.assign({clutch:0,brake:0,gear:0,rate:0.8},st.start.v),lamps:st.start.lamps,flows:st.start.flows,f:Object.assign({},st.start.f),cam:st.cam,done:new Set()};
+  for(let j=0;j<=k;j++){ const p=st.steps[j];
+    if(p.v) Object.assign(S.v,p.v); if(p.lamps) S.lamps=p.lamps; if(p.flows) S.flows=p.flows; if(p.f) Object.assign(S.f,p.f); if(p.cam) S.cam=p.cam;
+    if(j<k) p.focus.forEach(id=>S.done.add(id)); }
+  S.focus=st.steps[k].focus; return S;
+}
+let stageMode=false, stageIdx=0, stepIdx=0, stageT0=0, CUR=null, playTimer=null;
 const ST={rpm:0,spd:0,volts:12.6,temp:0.1,clutch:0,brake:0,gear:0,steer:0};
 function setStageMode(on){
   stageMode=on;
@@ -663,38 +723,64 @@ function setStageMode(on){
   document.getElementById("dash").hidden=!on;
   document.querySelectorAll(".group").forEach(g=>g.hidden=on?(g.dataset.sec!=="stages"):(g.dataset.sec==="stages"));
   document.querySelector(".search").hidden=on;
-  if(on){ if(selected) select(null); if(bodyMode!=="xray") setBodyMode("xray"); goStage(stageIdx,true); }
-  else { Object.assign(ST,{rpm:0,spd:0,volts:12.6,temp:0.1,clutch:0,brake:0,gear:0,steer:0}); resetAnim(); document.getElementById("pos").textContent="Overview";
+  if(on){ if(selected) select(null); if(bodyMode!=="xray") setBodyMode("xray"); goStep(stageIdx,stepIdx,true); }
+  else { stopPlay(); Object.assign(ST,{rpm:0,spd:0,volts:12.6,temp:0.1,clutch:0,brake:0,gear:0,steer:0}); resetAnim(); document.getElementById("pos").textContent="Overview";
     try{ if(/^#stage-/.test(location.hash)) history.replaceState(null,"",location.pathname+location.search); }catch(e){} applyVisuals(); }
 }
-function goStage(i,fly){
-  stageIdx=(i+STAGES.length)%STAGES.length; const st=STAGES[stageIdx];
+function goStage(i,fly){ goStep((i+STAGES.length)%STAGES.length,0,fly); }
+function goStep(si,k,fly){
+  const prevStage=stageIdx; stageIdx=si; stepIdx=k; const st=STAGES[si];
+  const S=stageState(si,k); CUR=S;
+  if(k===0 || si!==prevStage){ const s0=stageState(si,0); Object.assign(ST,{rpm:st.start.v.rpm,spd:st.start.v.spd,volts:st.start.v.volts,temp:st.start.v.temp,clutch:st.start.v.clutch||0,brake:st.start.v.brake||0,gear:st.start.v.gear||0}); }
   stageT0=null;
-  if(st.from) Object.assign(ST,st.from);
-  document.getElementById("pos").textContent="Stage "+(stageIdx+1)+" / "+STAGES.length;
-  document.getElementById("sNum").textContent="Stage "+(stageIdx+1)+" of "+STAGES.length;
+  document.getElementById("pos").textContent="Stage "+(si+1)+" · step "+(k+1)+"/"+st.steps.length;
+  document.getElementById("sNum").textContent="Stage "+(si+1)+" of "+STAGES.length+" · step "+(k+1)+" of "+st.steps.length;
   document.getElementById("sTitle").textContent=st.t;
-  const ul=document.getElementById("sText"); ul.innerHTML=""; st.text.forEach(t=>{ const li=document.createElement("li"); li.textContent=t; ul.appendChild(li); });
+  const ol=document.getElementById("sText"); ol.innerHTML="";
+  st.steps.forEach((p,j)=>{ const li=document.createElement("li"); li.className="stepi"+(j<k?" done":j===k?" cur":"");
+    const b=document.createElement("button"); b.type="button"; b.innerHTML='<span class="sn"></span><span class="st"></span>';
+    b.querySelector(".sn").textContent=j<k?"✓":(j+1); b.querySelector(".st").textContent=p.s; b.addEventListener("click",()=>{ stopPlay(); goStep(si,j,true); });
+    if(j===k) b.setAttribute("aria-current","step"); li.appendChild(b); ol.appendChild(li); });
   const ch=document.getElementById("sParts"); ch.innerHTML="";
-  st.focus.forEach(id=>{ const b=document.createElement("button"); b.className="chip"; b.type="button"; b.textContent=BY_ID[id].n; b.addEventListener("click",()=>{ setStageMode(false); select(id,true); }); ch.appendChild(b); });
-  document.querySelectorAll(".stageitem").forEach((b,k)=>b.setAttribute("aria-current",k===stageIdx?"true":"false"));
+  S.focus.forEach(id=>{ const b=document.createElement("button"); b.className="chip"; b.type="button"; b.textContent=BY_ID[id].n; b.addEventListener("click",()=>{ stopPlay(); setStageMode(false); select(id,true); }); ch.appendChild(b); });
+  document.querySelectorAll(".stageitem").forEach((b,j)=>b.setAttribute("aria-current",j===si?"true":"false"));
   const lampEl=document.getElementById("lamps"); lampEl.innerHTML="";
-  LAMPS.forEach(([k,n,c])=>{ const d=document.createElement("span"); d.className="lamp "+c+(st.lamps[k]?" on":""); d.textContent=n; lampEl.appendChild(d); });
+  LAMPS.forEach(([q,n,c])=>{ const d=document.createElement("span"); d.className="lamp "+c+(S.lamps[q]?" on":""); d.textContent=n; lampEl.appendChild(d); });
   const lg=document.getElementById("legend"); lg.innerHTML="";
   const seen=new Set();
-  st.flows.forEach(k=>{ const lab=FLOWLABEL[k]; if(!lab||seen.has(lab)) return; seen.add(lab);
-    if(!seen.size || lg.childElementCount===0){ const h=document.createElement("div"); h.className="lt"; h.textContent="Glowing lines show"; lg.appendChild(h); }
-    const c="#"+FLOWDEF[k][0].toString(16).padStart(6,"0");
+  S.flows.forEach(q=>{ const lab=FLOWLABEL[q]; if(!lab||seen.has(lab)) return; seen.add(lab);
+    if(lg.childElementCount===0){ const h=document.createElement("div"); h.className="lt"; h.textContent="Glowing lines show"; lg.appendChild(h); }
+    const c="#"+FLOWDEF[q][0].toString(16).padStart(6,"0");
     const d=document.createElement("div"); d.className="li"; d.innerHTML='<span class="dot"></span><span></span>';
-    d.querySelector(".dot").style.background=c; d.querySelector(".dot").style.color=c; d.lastChild.textContent=lab; lg.appendChild(d); });
-  try{ if(location.hash!=="#stage-"+(stageIdx+1)) location.replace("#stage-"+(stageIdx+1)); }catch(e){}
+    d.querySelector(".dot").style.background=c; d.lastChild.textContent=lab; lg.appendChild(d); });
+  const hash="#stage-"+(si+1)+"-"+(k+1);
+  try{ if(location.hash!==hash) location.replace(hash); }catch(e){}
   if(isPhone()) document.getElementById("panel").scrollTop=0;
-  if(fly && renderer) flyTo(V(st.cam[1]),V(st.cam[0]));
-  setFlows(st.flows);
+  const camChanged = k===0 || si!==prevStage || (st.steps[k].cam) || (k>0 && st.steps[k-1].cam);
+  if(fly && renderer && camChanged) flyTo(V(S.cam[1]),V(S.cam[0]));
+  // callout on the first part of this step
+  focusCenter=null;
+  if(renderer){ const m=comps[S.focus[0]].meshes; let best=null,bd=1e9; const cp=V(S.cam[0]);
+    m.forEach(x=>{ const c=new THREE.Box3().setFromObject(x).getCenter(new THREE.Vector3()), d=c.distanceTo(cp); if(d<bd){bd=d;best=c;} }); focusCenter=best; }
+  document.getElementById("cSec").textContent="Step "+(si+1)+"."+(k+1);
+  document.getElementById("cName").textContent=BY_ID[S.focus[0]].n;
+  setFlows(S.flows);
   applyVisuals();
 }
+function stepStage(d){
+  const st=STAGES[stageIdx]; let si=stageIdx, k=stepIdx+d;
+  if(k>=st.steps.length){ si=(si+1)%STAGES.length; k=0; }
+  else if(k<0){ si=(si-1+STAGES.length)%STAGES.length; k=STAGES[si].steps.length-1; }
+  goStep(si,k,true);
+}
+function stopPlay(){ if(playTimer){ clearInterval(playTimer); playTimer=null; } const b=document.getElementById("sPlay"); if(b){ b.textContent="▶ Play steps"; b.setAttribute("aria-pressed","false"); } }
+function togglePlay(){
+  if(playTimer){ stopPlay(); return; }
+  const b=document.getElementById("sPlay"); b.textContent="❚❚ Pause"; b.setAttribute("aria-pressed","true");
+  playTimer=setInterval(()=>{ if(!stageMode){ stopPlay(); return; } stepStage(1); },4000);
+}
 function step(d){
-  if(stageMode){ goStage(stageIdx+d,true); return; }
+  if(stageMode){ stopPlay(); stepStage(d); return; }
   let i=selected?ORDER.indexOf(selected):(d>0?-1:ORDER.length);
   i=(i+d+ORDER.length)%ORDER.length;
   select(ORDER[i],true);
@@ -1153,8 +1239,9 @@ function setMat(mt,dim,b){
 function applyVisuals(){
   if(!scene) return;
   for(const id in comps){
-    const inStage=stageMode && !selected && STAGES[stageIdx].focus.includes(id);
-    const isSel=selected===id, isHov=hovered===id, dim=selected ? !isSel : (stageMode && !inStage);
+    const stCur=stageMode && !selected && CUR && CUR.focus.includes(id), stDone=stageMode && !selected && CUR && CUR.done.has(id);
+    const inStage=stCur||stDone;
+    const isSel=selected===id||stCur, isHov=hovered===id, dim=selected ? selected!==id : (stageMode && !inStage);
     for(const m of comps[id].meshes){
       const b=m.userData.base, mt=m.material;
       setMat(mt,dim,b);
@@ -1315,7 +1402,7 @@ if(renderer){
 const lead=document.getElementById("lead"), leadLine=document.getElementById("leadLine"), leadDot=document.getElementById("leadDot");
 const callout=document.getElementById("callout");
 function updateCallout(){
-  if(!selected || !focusCenter){ lead.style.display="none"; callout.style.display="none"; return; }
+  if((!selected && !stageMode) || !focusCenter){ lead.style.display="none"; callout.style.display="none"; return; }
   const w=stage.clientWidth, h=stage.clientHeight, v=focusCenter.clone().project(camera);
   if(v.z>1 || Math.abs(v.x)>1.1 || Math.abs(v.y)>1.1){ lead.style.display="none"; callout.style.display="none"; return; }
   const x=(v.x+1)/2*w, y=(1-v.y)/2*h;
@@ -1419,18 +1506,12 @@ const lerp=(a,b,k)=>a+(b-a)*k;
 function stageTick(dt){
   if(!stageMode) return;
   if(stageT0===null) stageT0=performance.now();
-  const st=STAGES[stageIdx], t=(performance.now()-stageT0)/1000, k=Math.min(1,dt*1.8);
-  const v=st.v;
-  // timed targets
-  let tgtClutch = v.clutch||0;
-  if(stageIdx===4) tgtClutch = t<1.2?1:0;          // release clutch after selecting gear
-  let tgtSpd = v.spd, tgtRpm=v.rpm;
-  if(stageIdx===4 && t<1.6){ tgtSpd=0; tgtRpm=900; }
-  if(stageIdx===5){ tgtSpd = Math.max(0,30-t*6); tgtRpm = tgtSpd>3?1500-t*120:800; }
-  ST.clutch=lerp(ST.clutch,tgtClutch,Math.min(1,dt*(stageIdx===4?1.2:4)));
+  const st={...CUR.f}, t=(performance.now()-stageT0)/1000, k=Math.min(1,dt*1.8);
+  const v=CUR.v;
+  ST.clutch=lerp(ST.clutch,v.clutch||0,Math.min(1,dt*(v.clutch?4:1.2)));
   ST.brake=lerp(ST.brake,v.brake||0,Math.min(1,dt*4));
-  ST.gear=lerp(ST.gear,(v.gear&&t>0.8)?1:0,Math.min(1,dt*4));
-  ST.rpm=lerp(ST.rpm,tgtRpm,k); ST.spd=stageIdx===5?tgtSpd:lerp(ST.spd,tgtSpd,Math.min(1,dt*0.8)); ST.volts=lerp(ST.volts,v.volts,k); ST.temp=lerp(ST.temp,v.temp,Math.min(1,dt*0.6));
+  ST.gear=lerp(ST.gear,v.gear||0,Math.min(1,dt*4));
+  ST.rpm=lerp(ST.rpm,v.rpm,k); ST.spd=lerp(ST.spd,v.spd,Math.min(1,dt*(v.rate||0.8))); ST.volts=lerp(ST.volts,v.volts,k); ST.temp=lerp(ST.temp,v.temp,Math.min(1,dt*0.6));
   ST.steer = st.steer ? Math.sin(t*1.1)*0.42 : lerp(ST.steer,0,k);
   // dashboard
   document.getElementById("gRpm").textContent=Math.round(ST.rpm/10)*10;
@@ -1512,7 +1593,8 @@ document.getElementById("prev").addEventListener("click",()=>step(-1));
 document.getElementById("mode-parts").addEventListener("click",()=>{ if(stageMode) setStageMode(false); });
 document.getElementById("mode-stages").addEventListener("click",()=>{ if(!stageMode) setStageMode(true); });
 document.getElementById("sExit").addEventListener("click",()=>setStageMode(false));
-document.getElementById("sReplay").addEventListener("click",()=>goStage(stageIdx,false));
+document.getElementById("sReplay").addEventListener("click",()=>{ stopPlay(); goStep(stageIdx,0,true); });
+document.getElementById("sPlay").addEventListener("click",togglePlay);
 document.getElementById("next").addEventListener("click",()=>step(1));
 function togglePresent(){
   const on=!document.body.classList.contains("present");
@@ -1538,8 +1620,9 @@ document.getElementById("dLink").addEventListener("click",()=>{
 });
 function fromHash(){
   const id=(location.hash||"").replace(/^#/,"");
-  const sm=/^stage-(\d+)$/.exec(id);
-  if(sm){ const n=+sm[1]-1; if(n>=0 && n<STAGES.length){ if(!stageMode){ stageIdx=n; setStageMode(true); } else if(n!==stageIdx) goStage(n,true); } return; }
+  const sm=/^stage-(\d+)(?:-(\d+))?$/.exec(id);
+  if(sm){ const n=+sm[1]-1; if(n>=0 && n<STAGES.length){ const kk=Math.min(Math.max(0,(+sm[2]||1)-1),STAGES[n].steps.length-1);
+      if(!stageMode){ stageIdx=n; stepIdx=kk; setStageMode(true); } else if(n!==stageIdx||kk!==stepIdx) goStep(n,kk,true); } return; }
   if(id==="engine-bay"){ if(selected) select(null); if(stageMode) setStageMode(false); setLabels(true); const v=VIEWS.bay; flyTo(V(v[1]),V(v[0])); return; }
   if(id && BY_ID[id] && id!==selected) select(id,true);
   else if(!id && selected) select(null);
@@ -1551,6 +1634,7 @@ window.addEventListener("keydown",e=>{
   if(typing){ if(e.key==="Escape") t.blur(); return; }
   if(e.metaKey||e.ctrlKey||e.altKey) return;
   const k=e.key;
+  if(stageMode && e.shiftKey && (k==="ArrowRight"||k==="ArrowLeft")){ e.preventDefault(); stopPlay(); goStep((stageIdx+(k==="ArrowRight"?1:-1)+STAGES.length)%STAGES.length,0,true); return; }
   if(k==="ArrowRight"||k==="ArrowDown"||k==="PageDown"){ e.preventDefault(); step(1); }
   else if(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"){ e.preventDefault(); step(-1); }
   else if(k==="Escape"||k==="Home"){ if(stageMode){ setStageMode(false); } if(selected) select(null); const v=VIEWS.front; flyTo(V(v[1]),V(v[0])); }
